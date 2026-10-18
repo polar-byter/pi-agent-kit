@@ -10,7 +10,7 @@ jobs:
   kit-tests:
     runs-on: windows-2022
     env:
-      PI_KIT_RUNTIME_HOME: '${{ runner.temp }}\pi-kit-python'
+      PI_KIT_RUNTIME_HOME: '${{ github.workspace }}\.tools\python-runtime'
       PI_KIT_NATIVE_SMOKE: '1'
       PYTHONDONTWRITEBYTECODE: '1'
       PYTHONIOENCODING: utf-8
