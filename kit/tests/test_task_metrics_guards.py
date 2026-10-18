@@ -194,7 +194,7 @@ class GuardCase(unittest.TestCase):
         self.metrics.start('task', limits={'max_no_result': 1})
         self.metrics.test('task', [sys.executable, '-c', 'import sys; sys.exit(1)'])
         self.metrics.resume('task', 'Пользователь починил сборку')
-        report = self.metrics.finish('task')
+        report = self.metrics.finish('task', language='ru')
         self.assertIn('Прогоны без результата', report)
         self.assertIn('Остановки по защитным лимитам: **1**', report)
         self.assertIn('Пользователь починил сборку', report)

@@ -71,7 +71,8 @@ def project_path(value: str, source: Path) -> Path:
     except (OSError, ValueError):
         raise InstallError('Choose a regular folder, not a symbolic link or junction.') from None
     source = Path(source).resolve()
-    if path == Path(path.anchor) or path.is_relative_to(source) or source.is_relative_to(path):
+    canonical_destination = path.resolve()
+    if path == Path(path.anchor) or canonical_destination.is_relative_to(source) or source.is_relative_to(canonical_destination):
         raise InstallError('Choose a separate project folder outside the downloaded kit.')
     if path.exists() and not path.is_dir():
         raise InstallError('This path is a file. Choose a folder instead.')

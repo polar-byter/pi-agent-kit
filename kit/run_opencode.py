@@ -19,10 +19,12 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 try:
+    from .task_control_state import plain_path
     from .check_env import strip_jsonc
     from .lmstudio_models import base_url, configured_model, loaded_models, select_model
     from .opencode_cli import is_wrapper, locate_opencode
 except ImportError:
+    from task_control_state import plain_path
     from check_env import strip_jsonc
     from lmstudio_models import base_url, configured_model, loaded_models, select_model
     from opencode_cli import is_wrapper, locate_opencode
@@ -220,8 +222,7 @@ def _prepare(root: Path, explicit: str | None = None):
     for agent, filename in prompt_names.items():
         prompt = root / 'kit' / 'prompts' / filename
         if prompt.is_file():
-            if prompt.resolve() != prompt.absolute():
-                raise ValueError('Role prompts must be regular project files')
+            plain_path(prompt)
             patch['agents'][agent] = {'system': prompt.read_text(encoding='utf-8')}
     model = None
     if executors['source'] == 'lmstudio':

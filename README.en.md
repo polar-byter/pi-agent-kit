@@ -77,3 +77,10 @@ In a fresh project the Chief received only the game requirements, dispatched two
 reviewed and integrated their results, checked the interface and recorded finish.
 The observer did not guide development or perform acceptance. System defects,
 subsequent fixes and evidence limits are recorded in the [run report](docs/kit/PI_CLEAN_RUN.ru.md).
+
+## Native Pi terminal
+
+Regular start.cmd now opens the official Pi InteractiveMode and its multiline editor.
+Use `install.cmd --update "D:\your-project"` from the updated template to refresh
+an installed project while preserving its application, settings and history.
+See the [quick start](docs/user/PI_QUICKSTART.en.md).

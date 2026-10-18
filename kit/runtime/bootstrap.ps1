@@ -57,7 +57,7 @@ try {
     $platform = switch ($architecture.ToUpperInvariant()) {
         'AMD64' { 'windows_x64' }
         'ARM64' { 'windows_arm64' }
-        default { throw 'OpenCode Kit supports Windows x64 and ARM64.' }
+        default { throw 'Pi Kit supports Windows x64 and ARM64.' }
     }
     $cache = if ($env:PI_KIT_RUNTIME_HOME) { $env:PI_KIT_RUNTIME_HOME } elseif ($env:OPENCODE_KIT_RUNTIME_HOME) { $env:OPENCODE_KIT_RUNTIME_HOME } else {
         Join-Path $env:LOCALAPPDATA 'OpenCodeKit\runtimes'
@@ -86,7 +86,7 @@ try {
         if (Test-Path -LiteralPath $target) {
             throw "The private Python runtime is damaged: $target. Rename that folder and try again."
         }
-        Write-Host "OpenCode Kit: preparing Python $version (first launch only)..."
+        Write-Host "Pi Kit: preparing Python $version (first launch only)..."
         $stage = Join-Path $cache ('.setup-' + [guid]::NewGuid().ToString('N'))
         [IO.Directory]::CreateDirectory($stage) | Out-Null
         $archive = Join-Path $stage 'python.zip'
@@ -133,7 +133,7 @@ try {
     $result = $child.ExitCode
     $child.Dispose()
 } catch {
-    [Console]::Error.WriteLine('OpenCode Kit: ' + $_.Exception.Message)
+    [Console]::Error.WriteLine('Pi Kit: ' + $_.Exception.Message)
     $result = 1
 } finally {
     if ($null -ne $lockStream) { $lockStream.Dispose() }

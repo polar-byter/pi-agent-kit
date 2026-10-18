@@ -35,7 +35,7 @@ class PiConsoleTests(unittest.TestCase):
 
     def test_one_shot_paused_request_returns_the_protective_exit_code(self):
         with self.configured_console_without_model_calls() as (_, errors):
-            result = run_pi.main(['--root', str(self.root), '--prompt', 'continue', '--no-browser'])
+            result = run_pi.main(['--root', str(self.root), '--headless', '--prompt', 'continue', '--no-browser'])
         self.assertEqual(result, 3)
         self.assertIn('paused', errors.getvalue())
         self.assertNotIn('Traceback', errors.getvalue())
@@ -43,7 +43,7 @@ class PiConsoleTests(unittest.TestCase):
     def test_interactive_pause_keeps_the_console_available_for_local_commands(self):
         with self.configured_console_without_model_calls() as (_, errors), \
                 patch('builtins.input', side_effect=['continue', '/quit']):
-            result = run_pi.main(['--root', str(self.root), '--no-browser'])
+            result = run_pi.main(['--root', str(self.root), '--headless', '--no-browser'])
         self.assertEqual(result, 0)
         self.assertIn('paused', errors.getvalue())
         self.assertNotIn('Traceback', errors.getvalue())

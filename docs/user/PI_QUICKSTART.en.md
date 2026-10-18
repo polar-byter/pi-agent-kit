@@ -40,36 +40,36 @@ themes. Use it for `/login`, then return to regular `start.cmd` for tasks.
 Custom API connections still use the configurator's address, model and
 environment-key fields; this native login step is for the `pi` source.
 
-For one prompt:
+Run `start.cmd` in the target project to open Pi's official interactive terminal.
+Type or paste your requirements directly into its editor and press Enter.
+A TASK.md file is optional. Shift+Enter or Ctrl+J inserts a line break.
+The kit opens the dashboard and binds this same Pi conversation to its journal.
+
+Use `/kit-pause`, `/kit-resume`, `/kit-cancel`, `/kit-status` and `/kit-dashboard`
+for kit controls. Pi's `/new`, `/resume`, editor and history remain native.
+Switching or forking an unfinished conversation requires a confirmed pause;
+protective STOP limits remain in force. `/quit` pauses unfinished work before exit.
+
+For unattended automation, explicitly select the RPC mode:
 
 ```powershell
-.\start.cmd --prompt "Read TASK.md and start following the kit rules"
+.\start.cmd --headless --prompt "Implement the requirements in TASK.md"
 ```
 
-This sends a real model request and may consume paid tokens. Installation and
-`start.cmd --prepare-only` do not send a task to a model.
+To reopen a kit session, use `start.cmd --session ses_your_identifier`.
+Copy its identifier from `/kit-status`. Resume a paused task through the dashboard
+or `/kit-resume`. Requests use the chosen model; setup does not generate a task response.
 
-| Command | Purpose |
-| --- | --- |
-| `/sessions` | List project sessions |
-| `/pause` | Pause the whole task |
-| `/resume` | Resume the current task |
-| `/cancel` | Stop the task without accepting its result |
-| `/quit` | Close the console while leaving the service available |
-| `start.cmd --configure` | Open model settings |
-| `start.cmd --authenticate` | Connect a built-in Pi provider in this project |
-| `start.cmd --stop-service` | Safely close the project service |
+To update an installed project, pause its work and close its old terminal, then
+run this command from the updated template directory:
 
-Closing the dashboard browser does not stop the agents. Wait for confirmed pause
-before changing role models, save and prepare the new settings, then resume.
-Restarting a saved session restores its conversation, not an interrupted network
-request. The console belongs to the kit and uses its Pi RPC service; a separately
-started Pi TUI does not manage these sessions automatically.
+```powershell
+.\install.cmd --update "D:\Projects\my-pi-project"
+```
 
-Plain `start.cmd` starts a new task. To reopen an existing conversation, pass
-`--session` with the exact ID shown by the earlier `Session:` line or `/sessions`.
-Then use `/resume` for a paused task. While the console waits for a response,
-use `Ctrl+C` or the dashboard to pause.
+The updater verifies installation hashes and refuses to replace edited kit files.
+Application files, model settings, keys and task history are preserved. Start
+`start.cmd` in the project again; role configuration does not need to be repeated.
 
 Settings are kept under `.pi`, task records and working copies under `.metrics`.
 Installed projects reference the template’s `.tools/pi` through `.pi/installation.json`;

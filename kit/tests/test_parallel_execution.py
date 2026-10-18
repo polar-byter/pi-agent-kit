@@ -595,7 +595,7 @@ class ParallelExecutionTests(unittest.TestCase):
         export = self.home / 'empty-root-export.json'
         export.write_text(json.dumps({'info': {'id': 'ses_root'}, 'messages': []}), encoding='utf-8')
         self.metrics.ux_review('demo', skipped='no browser available in tests')
-        text = self.metrics.finish('demo', [str(export)])
+        text = self.metrics.finish('demo', [str(export)], language='ru')
         self.assertIn('Расход по попыткам', text)
         self.assertEqual(self.metrics.read('demo')[-1]['kind'], 'finish')
 

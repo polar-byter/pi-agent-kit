@@ -163,6 +163,7 @@ def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path.cwd())
     parser.add_argument('--prompt', help='Send one request and wait for the current work to settle.')
+    parser.add_argument('--headless', action='store_true', help='Use the RPC automation console instead of the native Pi terminal UI.')
     parser.add_argument('--task', help='Choose an unused task ID for a new conversation.')
     parser.add_argument('--session', help='Continue this exact existing session and its task.')
     parser.add_argument('--prepare-only', action='store_true')
@@ -201,6 +202,9 @@ def main(arguments=None) -> int:
             prepare_pi_configuration(project_root)
         else:
             resolve_role_model_references(project_root)
+        if not options.headless:
+            from .pi_native import launch_native_pi
+            return launch_native_pi(project_root, options)
         if options.session:
             session_identifier = options.session
             task_identifier = find_task_for_session(project_root, session_identifier)

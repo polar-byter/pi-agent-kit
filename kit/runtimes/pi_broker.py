@@ -14,6 +14,7 @@ import time
 import uuid
 
 from .pi_exports import normalize_session_export
+from .pi_interactive import PiInteractiveProcess
 from .pi_rpc import PiControlError, PiRpcProcess, process_identity, terminate_verified_process
 
 
@@ -143,6 +144,9 @@ class ProjectPiBroker:
 
     def refresh(self, session):
         process = self.processes.get(session['id'])
+        if not process and session.get('interactive') and self._previous_process_is_alive(session):
+            process = PiInteractiveProcess(session)
+            self.processes[session['id']] = process
         if process:
             if process.process.poll() is not None:
                 if not process.settled.is_set() or process.process.returncode:
@@ -176,6 +180,8 @@ class ProjectPiBroker:
             return self.processes[session['id']]
         if session['status'] == 'unknown':
             raise PiControlError('Previous Pi process is still alive; confirm its stop before restoring')
+        if session.get('native_transcript_name'):
+            raise PiControlError('Open the native conversation with start.cmd --session ' + session['id'])
         from ..pi_configuration import locate_pi_command, pi_process_environment
         configuration = self.configuration()
         command = list(locate_pi_command(self.root))
@@ -318,7 +324,10 @@ class ProjectPiBroker:
             if member.get('id') != member_identifier:
                 raise PiControlError('Session identity does not match the project registry')
             transcript = canonical_plain_path(member['transcript'])
-            expected_transcript = self.folder / 'sessions' / (member_identifier + '.jsonl')
+            expected_name = member.get('native_transcript_name', member_identifier + '.jsonl')
+            if Path(expected_name).name != expected_name:
+                raise PiControlError('Invalid native history name')
+            expected_transcript = self.folder / 'sessions' / expected_name
             if transcript != expected_transcript:
                 raise PiControlError('Session transcript does not match its registered identity')
             self.refresh(member)
@@ -336,7 +345,10 @@ class ProjectPiBroker:
         for member, transcript in family:
             process = self.processes.get(member['id'])
             if process:
-                process.close()
+                if isinstance(process, PiInteractiveProcess):
+                    process.shutdown()
+                else:
+                    process.close()
                 self.processes.pop(member['id'], None)
             member['status'] = 'stopped'
             member.pop('process', None)
@@ -348,6 +360,12 @@ class ProjectPiBroker:
         return dict(removed=True)
 
     def dispatch(self, operation, params=None, data=None):
+        # Pi can check admission while an interrupt waits for its current tool.
+        # The journal and task controls own their locks; taking the process lock
+        # here would make both sides wait for each other.
+        if operation.startswith('task.'):
+            from .pi_native_state import interactive_task_operation
+            return interactive_task_operation(self, operation, (params or {}).get('sessionID'), data or {})
         with self.lock:
             result = self._dispatch(operation, params or {}, data or {})
             self.save()
@@ -356,6 +374,12 @@ class ProjectPiBroker:
     def _dispatch(self, operation, params, data):
         if operation == 'service.health':
             return dict(project=str(self.root), protocol=1)
+        if operation == 'session.attachInteractive':
+            from .pi_native_state import attach_interactive_session
+            return attach_interactive_session(self, data)
+        if operation == 'session.detachInteractive':
+            from .pi_native_state import interactive_task_operation
+            return interactive_task_operation(self, operation, params.get('sessionID'), data)
         if operation == 'session.create':
             return self.create(data)
         if operation == 'session.list':
@@ -381,15 +405,28 @@ class ProjectPiBroker:
                 self.refresh(session)
                 if session['status'] in ('running', 'unknown'):
                     raise PiControlError('Stop every project session before preparing new models')
-            for process in self.processes.values():
-                process.close()
-            self.processes.clear()
-            for session in self.sessions.values():
-                session['status'] = 'stopped'
-                session.pop('process', None)
+            for identifier, process in list(self.processes.items()):
+                if isinstance(process, PiInteractiveProcess):
+                    process.request('reload_models')
+                else:
+                    process.close()
+                    self.processes.pop(identifier)
+                    self.sessions[identifier]['status'] = 'stopped'
+                    self.sessions[identifier].pop('process', None)
             return dict(prepared=True)
         session = self.session(params.get('sessionID'))
         self.refresh(session)
+        if operation == 'session.releaseForInteractive':
+            if session.get('parentID') or session['status'] in ('running', 'unknown'):
+                raise PiControlError('Pause the existing task before opening its native terminal')
+            if session.get('interactive') and self._previous_process_is_alive(session):
+                raise PiControlError('This native conversation is already open in another terminal')
+            process = self.processes.pop(session['id'], None)
+            if process:
+                process.close()
+            session['status'] = 'stopped'
+            session.pop('process', None)
+            return dict(transcript=session['transcript'])
         if operation == 'session.get':
             return dict(data=self.public_session(session))
         if operation == 'session.export':

@@ -6,7 +6,7 @@ This project uses Pi Agent Kit. Read the task, the project source and currentste
 
 Accept requirements from the user's message or an existing TASK.md. The current explicit message takes precedence. Read the documents yourself and keep the accepted scope and work plan in currentsteps.md in this project root. A task already described in chat does not require TASK.md.
 
-The managed launcher supplies the exact task ID and Chief session ID. Its journal already exists. Keep those identities and never call start a second time. If a session was started outside the managed launcher, explain that dashboard control requires the managed entry point rather than attaching a second writer to its history.
+The native Pi integration supplies the exact task ID and Chief session ID in system context. Its journal already exists. Keep those identities and never call start a second time. If a session was started outside the managed launcher, explain that dashboard control requires the managed entry point rather than attaching a second writer to its history.
 
 ## Chief and workers
 
@@ -75,7 +75,7 @@ A protective stop remains active until the user decides and the Chief records ta
 
 ## Dashboard controls and model changes
 
-The launcher opens the task dashboard automatically. The dashboard can pause, continue, cancel and delete the selected task. It addresses the Chief and every worker through the project Pi service.
+The native Pi integration opens the task dashboard automatically. Use /kit-status to show its task and session IDs; /kit-pause, /kit-resume and /kit-cancel control the whole task. Pi /resume selects a conversation and is distinct from task continuation. The dashboard can pause, continue, cancel and delete the selected task. It addresses the Chief and every worker through the project Pi service.
 
 Pause blocks new admissions and confirms that linked execution stopped. Continue uses the same task and conversation: read the plan and inspect interrupted changes before proceeding. Cancellation is not successful completion. Delete removes confirmed stopped sessions and metrics while preserving application files.
 
@@ -92,7 +92,7 @@ Resolve all attempts, integrate accepted files, perform the final UI review wher
 Before finishing, write .metrics/<task>/progress/result.json with a launcher field
 containing the project-relative path to the application's actual launch script.
 The dashboard uses this record for its result link. The root start.cmd and
-start.sh open the Pi kit console and must never be registered as the application.
+start.sh open the native Pi interface and must never be registered as the application.
 
 ```text
 kit\python.cmd kit/task_metrics.py ux-review --task <task> --checks .metrics/<task>/ux-checks.json

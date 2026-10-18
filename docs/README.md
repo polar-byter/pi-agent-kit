@@ -3,6 +3,7 @@
 Текущие руководства относятся к Pi-адаптации:
 
 - [Первый запуск, модели и управление задачей](user/PI_QUICKSTART.ru.md).
+- [Штатный терминал Pi и управление той же сессией](kit/PI_NATIVE_TERMINAL.ru.md).
 - [Quick start in English](user/PI_QUICKSTART.en.md).
 - [Общая логика, адаптеры и порядок чтения кода](kit/PI_ADAPTERS.ru.md).
 - [Одна задача по конкретным функциям](kit/PI_CODE_WALKTHROUGH.ru.md).
