@@ -91,7 +91,7 @@ def next_action(role: str, reason: str, *, fixer_enabled: bool,
     budget explicitly. There is no route back to executor. This decision never
     overrides task pause/cancel state or the existing global STOP guards.
     """
-    implementation = ('implementation_error', 'step_limit', 'repeated_actions', 'deadline')
+    implementation = ('implementation_error', 'step_limit', 'repeated_actions', 'deadline', 'token_limit')
     infrastructure = ('api_error', 'rate_limit', 'setup_error')
     if (role not in ('executor', 'bug_fixer') or reason not in implementation + infrastructure + ('paused', 'cancelled')
             or type(fixer_enabled) is not bool or type(fixer_attempts) is not int or fixer_attempts < 0

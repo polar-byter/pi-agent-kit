@@ -111,3 +111,16 @@ Use complete informative function and variable names. Keep intermediate values w
 Generated directories .git, .metrics, .tools, .pi, __pycache__, .venv, node_modules, target, build, dist, bin and obj are outside source snapshots. Put no application source there. Logs, evidence and generated test reports belong in .metrics. Keep source extensions in kit/pi rather than the generated .pi directory.
 
 Use kit\python.cmd on Windows and sh kit/python.sh on Linux. The launcher selects the pinned private Python runtime. Do not install packages into system Python or alter the shared runtime. Application dependencies belong in a separate project virtual environment.
+
+## Failed isolated attempts
+
+The launch command returns a compact attempt_id and ready commands. Use that attempt_id
+for --attempt and --previous; worker_id identifies the worker, not the attempt.
+Supervision starts automatically. An additional watch reports the existing supervisor
+without starting another observer. Public tool calls each consume one execution step,
+including calls grouped in one assistant message.
+A stopped empty attempt reviewed as failed may continue through the selected Bug Fixer
+with --previous, under the same requirements, contracts and remaining budgets.
+A token_limit is an incomplete attempt and follows the bounded correction route.
+Do not disable the fixer, reset counters, change models or implement worker bodies
+to get around a rejected attempt. Task pause/resume does not reset repair budgets.

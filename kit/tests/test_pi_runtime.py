@@ -46,6 +46,18 @@ for line in sys.stdin:
 
 
 class PiRuntimeTests(unittest.TestCase):
+
+    def test_aborted_export_does_not_require_an_error_message(self):
+        export = normalize_session_export(dict(id='ses_test', project='project'), [dict(
+            id='message', message=dict(role='assistant', stopReason='aborted', content=[]))])
+        self.assertEqual(export['messages'][0]['info']['error']['type'], 'aborted')
+
+    def test_length_export_preserves_the_finish_reason_without_provider_error(self):
+        export = normalize_session_export(dict(id='ses_test', project='project'), [dict(
+            id='message', message=dict(role='assistant', stopReason='length', content=[]))])
+        self.assertEqual(export['messages'][0]['info']['finish'], 'length')
+        self.assertNotIn('error', export['messages'][0]['info'])
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name).resolve()

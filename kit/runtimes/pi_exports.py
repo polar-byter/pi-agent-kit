@@ -54,8 +54,8 @@ def normalize_session_export(session, entries):
                 limited = any(word in raw_error.lower() for word in ('429', 'rate limit', 'quota', 'too many requests'))
                 info['error'] = dict(name='RateLimitError' if limited else 'ProviderError',
                                      data=dict(message='429 provider rate limit' if limited else 'Pi provider request failed'))
-                if message.get('stopReason') == 'aborted':
-                    info['error'] = dict(type='aborted', message='Pi execution was interrupted')
+            if message.get('stopReason') == 'aborted':
+                info['error'] = dict(type='aborted', message='Pi execution was interrupted')
         parts = []
         content = message.get('content', [])
         if isinstance(content, str):

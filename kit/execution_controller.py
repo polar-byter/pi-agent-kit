@@ -21,6 +21,7 @@ from .task_metrics import TaskMetrics, pending_attempts, message_info, is_halted
 from .dashboard.session_control import SessionControl
 from .task_control_state import blocking_reason, plain_path
 from .provider_limits import quota_error
+from .execution_watch import claim_attempt_watcher, launch_summary
 from .runtime_selection import create_session_gateway, load_project_model_choices, uses_pi_runtime
 
 
@@ -136,9 +137,15 @@ class ExecutionController:
             return choices
 
     def binding(self, identifier):
-        rows = [e for e in self.metrics.read(self.task) if e['kind'] == 'attempt_session' and e['delegation_id'] == identifier]
+        events = self.metrics.read(self.task)
+        rows = [e for e in events if e['kind'] == 'attempt_session' and e['delegation_id'] == identifier]
+        if not rows:
+            matching_workers = [e for e in events if e['kind'] == 'delegation' and e.get('worker_id') == identifier]
+            if len(matching_workers) == 1:
+                raise ValueError('Expected an attempt ID, received a worker ID. Use --attempt ' + matching_workers[0]['event_id'])
+            raise ValueError('No session binding for attempt: ' + identifier)
         if len(rows) != 1:
-            raise ValueError('Attempt session is not bound exactly once')
+            raise ValueError('Multiple session bindings for attempt: ' + identifier)
         return rows[0]['session']
 
     def record(self, kind, **fields):
@@ -213,7 +220,7 @@ class ExecutionController:
             prior = self.attempt(previous)
             ended = [e for e in events if e['kind'] == 'attempt_end' and e['delegation_id'] == previous]
             reviewed = [e for e in events if e['kind'] == 'review' and e.get('delegation_id') == previous
-                        and e['result'] in ('rework', 'blocked')]
+                        and e['result'] in ('rework', 'failed', 'blocked')]
             reason = ended[-1]['reason'] if ended and ended[-1]['reason'] != 'returned' else 'implementation_error' if reviewed else None
             used = sum(e.get('previous_attempt') == previous for e in events if e['kind'] == 'attempt_session')
             recovery = bool(reviewed and reviewed[-1]['result'] == 'blocked' and prior['role'] == role)
@@ -367,7 +374,8 @@ class ExecutionController:
             info = message_info(message)
             if info.get('role', info.get('type')) != 'assistant':
                 continue
-            steps += 1
+            public_parts = message.get('parts', message.get('content', []))
+            steps += max(1, sum(part.get('type') == 'tool' for part in public_parts if isinstance(part, dict)))
             if info.get('error'):
                 if isinstance(info['error'], dict) and info['error'].get('type') == 'aborted':
                     return 'cancelled'
@@ -397,6 +405,10 @@ class ExecutionController:
                                for e in self.metrics.read(self.task))
                 if not admitted:
                     return 'setup_error' if reason else None
+                assistant_messages = [message_info(message) for message in export.get('messages', [])
+                                      if message_info(message).get('role', message_info(message).get('type')) == 'assistant']
+                if assistant_messages and assistant_messages[-1].get('finish') in ('length', 'max_tokens'):
+                    return reason or 'token_limit'
                 info = self.service.call('session.get', {'sessionID': sid})['data']
                 outcome = json.dumps(info.get('outcome', {})).lower()
                 return 'rate_limit' if '429' in outcome else 'api_error' if 'error' in outcome else reason or 'returned'
@@ -412,12 +424,26 @@ class ExecutionController:
         self.service.clear_inbox(sid)
         for _ in range(10):
             if sid not in self.service.active():
-                return self.record('attempt_end', delegation_id=identifier, reason=reason, stopped=True)
+                with self.metrics.lock(self.task):
+                    events = self.metrics.read_events_if_not_finished(self.task)
+                    ended = [event for event in events if event['kind'] == 'attempt_end'
+                             and event['delegation_id'] == identifier and event.get('stopped')]
+                    if ended:
+                        return ended[-1]
+                    return self.metrics.append(self.task, 'attempt_end', delegation_id=identifier, reason=reason, stopped=True)
             time.sleep(.2)
         self.record('attempt_end', delegation_id=identifier, reason=reason, stopped=False)
         raise ValueError('Worker stop is unconfirmed; no replacement may start')
 
     def watch(self, identifier, poll_seconds=2):
+        self.binding(identifier)
+        path = self.metrics.task_dir(self.task) / ('watch-' + identifier + '.lock')
+        with claim_attempt_watcher(path) as acquired:
+            if not acquired:
+                return dict(kind='watching', delegation_id=identifier, message='This attempt already has an active supervisor')
+            return self.watch_owned_attempt(identifier, poll_seconds)
+
+    def watch_owned_attempt(self, identifier, poll_seconds):
         self.binding(identifier)
         ready = plain_path(self.metrics.task_dir(self.task) / ('watch-' + identifier + '.ready.json'))
         ready.write_text(json.dumps({'pid': os.getpid(), 'attempt': identifier}), encoding='utf-8')
@@ -460,7 +486,7 @@ class ExecutionController:
                 stopped = self.stop(identifier, signal)
                 attempt = self.attempt(identifier)
                 choices = self.settings()
-                if signal in ('step_limit', 'repeated_actions', 'deadline'):
+                if signal in ('step_limit', 'repeated_actions', 'deadline', 'token_limit'):
                     self.metrics.inspect(self.task, attempt['work_item'])
                     review = self.metrics.review(self.task, attempt['work_item'], 'rework')
                     if review.get('halt'):
@@ -595,7 +621,9 @@ def main(argv=None):
             result = controller.repair_deadline(args.attempt, args.reason)
         else:
             result = controller.integrate(args.attempt)
-        print(json.dumps(result))
+        if args.action == 'launch':
+            result = launch_summary(args.task, result)
+        print(json.dumps(result, ensure_ascii=False))
         return 0
     except (ValueError, RuntimeError, OSError) as error:
         print('Execution blocked: ' + str(error), file=sys.stderr)
