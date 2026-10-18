@@ -59,7 +59,7 @@ try {
         'ARM64' { 'windows_arm64' }
         default { throw 'OpenCode Kit supports Windows x64 and ARM64.' }
     }
-    $cache = if ($env:OPENCODE_KIT_RUNTIME_HOME) { $env:OPENCODE_KIT_RUNTIME_HOME } else {
+    $cache = if ($env:PI_KIT_RUNTIME_HOME) { $env:PI_KIT_RUNTIME_HOME } elseif ($env:OPENCODE_KIT_RUNTIME_HOME) { $env:OPENCODE_KIT_RUNTIME_HOME } else {
         Join-Path $env:LOCALAPPDATA 'OpenCodeKit\runtimes'
     }
     if (-not [IO.Path]::IsPathRooted($cache)) { throw 'Runtime cache must be an absolute path.' }

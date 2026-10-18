@@ -17,7 +17,7 @@ printf '%s\n' "$digest" | grep -Eq '^[a-f0-9]{64}$' || fail 'Invalid Python chec
 [ "$(uname -s)" = Linux ] || fail 'This bootstrap supports Linux. See docs/kit/PYTHON_RUNTIME.ru.md for other systems.'
 architecture=$(uname -m)
 case "$architecture" in x86_64|aarch64) ;; *) fail 'Linux x86_64 and aarch64 are supported.' ;; esac
-cache=${OPENCODE_KIT_RUNTIME_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/opencode-kit/runtimes}
+cache=${PI_KIT_RUNTIME_HOME:-${OPENCODE_KIT_RUNTIME_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/opencode-kit/runtimes}}
 case "$cache" in /*) ;; *) fail 'Runtime cache must be an absolute path.' ;; esac
 # Resolve and reject links before any temporary cleanup.
 check=$cache

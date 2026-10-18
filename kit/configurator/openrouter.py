@@ -124,7 +124,7 @@ def select_models(models: list[Model], query='', scope='coding', tariff='all', t
 
 def request_catalog(url: str) -> dict:
     """Public GET, no credentials, bounded response; arbitrary provider output is data."""
-    request = Request(url, headers={'Accept': 'application/json', 'User-Agent': 'OpenCodeKit-Catalog/1'})
+    request = Request(url, headers={'Accept': 'application/json', 'User-Agent': 'PiKit-Catalog/1'})
     with urlopen(request, timeout=20) as response:
         raw = response.read(16 * 1024 * 1024 + 1)
     if len(raw) > 16 * 1024 * 1024:

@@ -1,7 +1,7 @@
-"""Configurator entry point and shared, window-independent form helpers.
+r"""Configurator entry point and shared, window-independent form helpers.
 
 Run from the project root:
-    py -m kit.configurator.app
+    kit\python.cmd -m kit.configurator.app
 
 The active window lives in desktop.py. Keep the learned form conversion and
 preparation helpers here so the launcher, workflow and tests share one contract.
@@ -24,20 +24,20 @@ from . import keys, models_choices_configurator, sources
 
 # Values of the radio buttons; 
 # they are also the keys of the form dictionary.
-MASTER_CHIEF_DEFAULT, MASTER_CHIEF_OPENCODE, MASTER_CHIEF_API = 'default', 'opencode', 'api'
-EXEC_LMSTUDIO, EXEC_OPENCODE, EXEC_API = 'lmstudio', 'opencode', 'api'
+MASTER_CHIEF_DEFAULT, MASTER_CHIEF_PI, MASTER_CHIEF_API = 'default', 'pi', 'api'
+EXEC_LMSTUDIO, EXEC_PI, EXEC_API = 'lmstudio', 'pi', 'api'
 
 # Project root: kit/configurator/app.py ->we go 2 levels up.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 #   Our form is a dictionary with these keys (these values are strings):
-#   master_chief_source      MASTER_CHIEF_DEFAULT | MASTER_CHIEF_OPENCODE | MASTER_CHIEF_API
+#   master_chief_source      MASTER_CHIEF_DEFAULT | MASTER_CHIEF_PI | MASTER_CHIEF_API
 #   master_chief_model       model reference or model name
 #   master_chief_url         API address (only for MASTER_CHIEF_API)
 #   master_chief_key_env     name of the key variable (only for MASTER_CHIEF_API)
-#   exec_source       EXEC_LMSTUDIO | EXEC_OPENCODE | EXEC_API
+#   exec_source       EXEC_LMSTUDIO | EXEC_PI | EXEC_API
 #   exec_instance     loaded instance ID or "" (only for EXEC_LMSTUDIO)
-#   exec_model        model reference (EXEC_OPENCODE) or model name (EXEC_API)
+#   exec_model        model reference (EXEC_PI) or model name (EXEC_API)
 #   exec_url, exec_key_env   (only for EXEC_API)
 EMPTY_FORM = {
     'master_chief_source': MASTER_CHIEF_DEFAULT,
@@ -50,7 +50,7 @@ EMPTY_FORM = {
     'exec_url': '',
     'exec_key_env': keys.EXECUTOR_KEY_ENV,
     'bug_fixer_source': 'disabled',
-    'bug_fixer_model': 'opencode/deepseek-v4.1-flash-free',
+    'bug_fixer_model': '',
     'bug_fixer_url': '',
     'bug_fixer_key_env': keys.BUG_FIXER_KEY_ENV,
     'max_executors': '2',
@@ -71,10 +71,10 @@ def form_to_choices(form: dict) -> dict:
     """Turn the values of the window fields into the content of the choice file.
 
     master_chief_source MASTER_CHIEF_DEFAULT -> no "masterChief" section;
-    MASTER_CHIEF_OPENCODE -> models_choices_configurator.master_chief_from_opencode(master_chief_model);
+    MASTER_CHIEF_PI -> models_choices_configurator.master_chief_from_pi(master_chief_model);
     MASTER_CHIEF_API -> models_choices_configurator.api_choice(master_chief_url, master_chief_model, master_chief_key_env).
     exec_source EXEC_LMSTUDIO -> models_choices_configurator.lmstudio_choice(exec_instance);
-    EXEC_OPENCODE -> models_choices_configurator.executors_from_opencode(exec_model);
+    EXEC_PI -> models_choices_configurator.executors_from_pi(exec_model);
     EXEC_API -> models_choices_configurator.api_choice(exec_url, exec_model, exec_key_env).
     Then models_choices_configurator.build_choices(master_chief, executors).
 
@@ -84,8 +84,8 @@ def form_to_choices(form: dict) -> dict:
     master_chief_source = form['master_chief_source']
     if master_chief_source == MASTER_CHIEF_DEFAULT:
         master_chief = None
-    elif master_chief_source == MASTER_CHIEF_OPENCODE:
-        master_chief = models_choices_configurator.master_chief_from_opencode(form['master_chief_model'])
+    elif master_chief_source == MASTER_CHIEF_PI:
+        master_chief = models_choices_configurator.master_chief_from_pi(form['master_chief_model'])
     elif master_chief_source == MASTER_CHIEF_API:
         master_chief = models_choices_configurator.api_choice(form['master_chief_url'], form['master_chief_model'], form['master_chief_key_env'])
     else:
@@ -93,16 +93,16 @@ def form_to_choices(form: dict) -> dict:
     exec_source = form['exec_source']
     if exec_source == EXEC_LMSTUDIO:
         executors = models_choices_configurator.lmstudio_choice(form['exec_instance'])
-    elif exec_source == EXEC_OPENCODE:
-        executors = models_choices_configurator.executors_from_opencode(form['exec_model'])
+    elif exec_source == EXEC_PI:
+        executors = models_choices_configurator.executors_from_pi(form['exec_model'])
     elif exec_source == EXEC_API:
         executors = models_choices_configurator.api_choice(form['exec_url'], form['exec_model'], form['exec_key_env'])
     else:
         raise ValueError(f'unknown executor_source: {exec_source}')
     result = models_choices_configurator.build_choices(master_chief, executors)
     source = form.get('bug_fixer_source', 'disabled')
-    if source == 'opencode':
-        result['bugFixer'] = models_choices_configurator.executors_from_opencode(form['bug_fixer_model'])
+    if source == 'pi':
+        result['bugFixer'] = models_choices_configurator.executors_from_pi(form['bug_fixer_model'])
     elif source == 'api':
         result['bugFixer'] = models_choices_configurator.api_choice(form['bug_fixer_url'], form['bug_fixer_model'], form['bug_fixer_key_env'])
     elif source != 'disabled':
@@ -134,8 +134,8 @@ def choices_to_form(data: dict) -> dict:
     result_form = dict(EMPTY_FORM)  # copy
     master_chief = data.get('masterChief')    
     if master_chief is not None:
-        if master_chief['source'] == MASTER_CHIEF_OPENCODE:
-            result_form['master_chief_source'] = MASTER_CHIEF_OPENCODE
+        if master_chief['source'] == MASTER_CHIEF_PI:
+            result_form['master_chief_source'] = MASTER_CHIEF_PI
             result_form['master_chief_model'] = master_chief['model']
         elif master_chief['source'] == MASTER_CHIEF_API:
             result_form['master_chief_source'] = MASTER_CHIEF_API
@@ -147,8 +147,8 @@ def choices_to_form(data: dict) -> dict:
         if executors['source'] == EXEC_LMSTUDIO:
             result_form['exec_source'] = EXEC_LMSTUDIO
             result_form['exec_instance'] = executors.get('instance', '')
-        elif executors['source'] == EXEC_OPENCODE:
-            result_form['exec_source'] = EXEC_OPENCODE
+        elif executors['source'] == EXEC_PI:
+            result_form['exec_source'] = EXEC_PI
             result_form['exec_model'] = executors['model']
         elif executors['source'] == EXEC_API:
             result_form['exec_source'] = EXEC_API
@@ -173,14 +173,14 @@ def choices_to_form(data: dict) -> dict:
 
 
 def apply_choices(root: Path = PROJECT_ROOT) -> tuple[int, str]:
-    """Rebuild the OpenCode overlay from the saved choice: run
-    "<python> kit/run_opencode.py --prepare-only" in the project root.
+    """Rebuild the Pi overlay from the saved choice: run
+    "<python> kit/run_pi.py --prepare-only" in the project root.
 
     Returns:
         (exit code, combined stdout and stderr text) — the window shows the text.
     """
     root = Path(root)
-    subprocess_args = [sys.executable, str( Path('kit') / "run_opencode.py"), '--prepare-only']
+    subprocess_args = [sys.executable, '-m', 'kit.run_pi', '--prepare-only']
     subprocess_kwargs = {
         'cwd': root,
         'capture_output': True,

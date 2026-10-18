@@ -8,6 +8,7 @@ import uuid
 from .. import task_control_state as state
 from ..task_metrics import TaskMetrics, is_halted, session_id, valid_number
 from .session_control import ControlError, SessionControl
+from ..runtime_selection import create_session_gateway, uses_pi_runtime
 
 ACTIONS = {'pause': 'pausing', 'resume': 'resuming', 'cancel': 'cancelling', 'delete': 'deleting'}
 
@@ -15,7 +16,7 @@ ACTIONS = {'pause': 'pausing', 'resume': 'resuming', 'cancel': 'cancelling', 'de
 class TaskControls:
     def __init__(self, root: Path, gateway=None):
         self.root = Path(root).resolve()
-        self.gateway = gateway or SessionControl(self.root)
+        self.gateway = gateway or create_session_gateway(self.root)
         self._lock = threading.Lock()
         self._workers = {}
 
@@ -39,7 +40,7 @@ class TaskControls:
         if action == 'delete' and not metrics.task_dir(task).exists() and state.read_state(self.root, task).get('session_removed'):
             return [], None
         events = metrics.read(task)
-        if events[0].get('server_mode') in ('standalone', 'unknown'):
+        if events[0].get('server_mode') in ('standalone', 'unknown') and not uses_pi_runtime(self.root):
             raise ValueError('Для этой задачи не подтверждён общий сервер Desktop. Управление из дашборда недоступно')
         if (metrics.task_dir(task) / 'events.jsonl').resolve().parent != metrics.task_dir(task):
             raise ValueError('Journal must not be redirected')

@@ -7,6 +7,13 @@ import time
 import uuid
 
 from . import task_control_state as state
+from .runtime_selection import load_project_model_choices, uses_pi_runtime
+
+
+def prepared_configuration_path(project_root):
+    """Select the prepared file whose contents a paused-task revision records."""
+    relative_path = '.pi/kit-runtime.json' if uses_pi_runtime(project_root) else '.opencode/opencode.jsonc'
+    return Path(project_root) / relative_path
 
 
 def fingerprint(value):
@@ -25,6 +32,9 @@ def revision(root, task, reference):
 
 
 def references(root, choices):
+    if uses_pi_runtime(root):
+        from .pi_configuration import resolve_role_model_references
+        return resolve_role_model_references(root, choices)
     from .run_opencode import strip_jsonc
     config = json.loads(strip_jsonc((root / 'opencode.jsonc').read_text(encoding='utf-8-sig')))
     overlay = json.loads(strip_jsonc((root / '.opencode/opencode.jsonc').read_text(encoding='utf-8')))
@@ -40,12 +50,11 @@ def references(root, choices):
 
 
 def verify_revision(root, task, reference):
-    from .run_opencode import load_choices
     value = revision(root, task, reference)
-    overlay = (root / '.opencode/opencode.jsonc').read_bytes()
-    if (fingerprint(load_choices(root)) != value['choices_hash'] or
+    overlay = prepared_configuration_path(root).read_bytes()
+    if (fingerprint(load_project_model_choices(root)) != value['choices_hash'] or
             hashlib.sha256(overlay).hexdigest() != value['overlay_hash']):
-        raise ValueError('Model settings changed. Prepare OpenCode again before continuing.')
+        raise ValueError('Model settings changed. Prepare the selected runtime again before continuing.')
     return value
 
 
@@ -53,7 +62,6 @@ def verify_revision(root, task, reference):
 def preparation(root):
     """Lock all unfinished bound tasks, verify their pause, then record a revision."""
     from .task_metrics import TaskMetrics
-    from .run_opencode import load_choices
     from .dashboard.controls import TaskControls
     root = Path(root).resolve()
     metrics = TaskMetrics(root)
@@ -76,13 +84,13 @@ def preparation(root):
             if controls.gateway.active() & set(tree):
                 raise ValueError('Linked sessions are still active. Pause the task again before changing models.')
             tasks.append((task, sid, current))
-        expected_choices = fingerprint(load_choices(root))
+        expected_choices = fingerprint(load_project_model_choices(root))
         yield
         if not tasks:
             return
-        choices = load_choices(root)
+        choices = load_project_model_choices(root)
         if fingerprint(choices) != expected_choices:
-            raise ValueError('Model settings changed. Prepare OpenCode again before continuing.')
+            raise ValueError('Model settings changed. Prepare the selected runtime again before continuing.')
         selected = references(root, choices)
         controls.gateway.prepare_models(choices, selected)
         for task, sid, current in tasks:
@@ -90,7 +98,7 @@ def preparation(root):
             identifier = uuid.uuid4().hex
             value = dict(task=task, revision=identifier, prepared_at=time.time(), choices=choices,
                          choices_hash=fingerprint(choices), models=selected,
-                         overlay_hash=hashlib.sha256((root / '.opencode/opencode.jsonc').read_bytes()).hexdigest())
+                         overlay_hash=hashlib.sha256(prepared_configuration_path(root).read_bytes()).hexdigest())
             folder = state.plain_path(metrics.task_dir(task) / 'model-settings')
             folder.mkdir(exist_ok=True)
             with (folder / (identifier + '.json')).open('x', encoding='utf-8') as handle:

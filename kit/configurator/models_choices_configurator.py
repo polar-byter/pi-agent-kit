@@ -1,8 +1,8 @@
-"""This part of the module Build, validate, read and write the file .opencode/kit-models.json.
+"""This part of the module Build, validate, read and write the file .pi/kit-models.json.
 
-The file format is a contract with kit/run_opencode.py (see load_choices there):
+The file format is a contract with kit/pi_configuration.py:
     {
-      "masterChief":     {"source": "opencode", "model": "provider/model"}
+      "masterChief":     {"source": "pi", "model": "provider/model"}
                    or {"source": "api", "baseURL": ..., "model": ..., "keyEnv": ...},
       "executors": {"source": "lmstudio"} or {"source": "lmstudio", "instance": ...}
                    or {"source": "api", "baseURL": ..., "model": ..., "keyEnv": ...}
@@ -19,20 +19,20 @@ import re
 
 
 # location where the choice file is put, relative to the project root.
-CHOICES_PATH = Path('.opencode') / 'kit-models.json'
+CHOICES_PATH = Path('.pi') / 'kit-models.json'
 
 # A valid environment variable name: a letter or "_", then letters, digits or "_".
 ENV_NAME = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
-MODEL_REF_PATTERN_FOR_CHECK_ = re.compile(r'^[^/]+(/[^/]+)+$')
+MODEL_REF_PATTERN_FOR_CHECK_ = re.compile(r'^[^/\s]+(/[^/\s]+)+$')
 
 # Step 1. Dictionaries.
 
-def master_chief_from_opencode(model: str) -> dict:
-    """the Master Chief uses a model that OpenCode already knows.
+def master_chief_from_pi(model: str) -> dict:
+    """the Master Chief uses a model that Pi already knows.
     Args:
-        model: reference like "openai/gpt-6.1-sol" or "opencode-go/deepseek-v4.1-flash".
+        model: reference like "openai/gpt-6.1-sol" or "openrouter/author/model".
     Returns:
-        {"source": "opencode", "model": <model without surrounding spaces>}
+        {"source": "pi", "model": <model without surrounding spaces>}
     Raises:
         ValueError: the model is empty or has no "/" (a provider name is required).
     """
@@ -42,20 +42,20 @@ def master_chief_from_opencode(model: str) -> dict:
     
     if not MODEL_REF_PATTERN_FOR_CHECK_.fullmatch(model):
         raise ValueError('the model is not in the format "provider/model"')
-    result_dict = {"source": "opencode", "model": model}
+    result_dict = {"source": "pi", "model": model}
     return result_dict
 
-def executors_from_opencode(model: str) -> dict:
-    """Choice "the executors use a model that OpenCode already knows", for example a free
-    OpenRouter model connected in OpenCode with /connect.
+def executors_from_pi(model: str) -> dict:
+    """Choice "the executors use a model that Pi already knows", for example a free
+    OpenRouter model authenticated in Pi with /login.
 
     The rules are the same as for the Master Chief, so the check is shared.
     Returns:
-        {"source": "opencode", "model": <model without surrounding spaces>}
+        {"source": "pi", "model": <model without surrounding spaces>}
     Raises:
         ValueError: the model is empty or has no "/".
     """
-    return master_chief_from_opencode(model)
+    return master_chief_from_pi(model)
 
 
 def api_choice(base_url: str, model: str, key_env: str) -> dict:
@@ -151,7 +151,7 @@ def save_choices(root: Path, choices: dict) -> Path:
 
     Writes to a temporary file next to the target first and then replaces the target.
     If the program crashes in the middle, the old file stays whole.
-    Creates the .opencode folder when it is missing. JSON is indented by 2 spaces,
+    Creates the .pi folder when it is missing. JSON is indented by 2 spaces,
     UTF-8, non-ASCII characters are kept as is, and the file ends with a newline.
     """
     root = Path(root)

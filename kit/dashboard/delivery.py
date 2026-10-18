@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 
 from . import tracking
 from ..task_metrics import valid_number
+from ..runtime_selection import uses_pi_runtime
 
 LAUNCH_FILES = ('run.ps1', 'start.ps1', 'run.sh', 'start.sh', 'run.cmd', 'start.cmd',
                 'run.bat', 'start.bat', 'run.py', 'start.py')
@@ -24,10 +25,16 @@ def launch_file(root: Path, task: str) -> Path | None:
         names = [result['launcher']]
     else:
         names = LAUNCH_FILES
+    pi_project = uses_pi_runtime(root)
     for name in names:
         try:
             target = tracking.project_file(root, name)
         except FileNotFoundError:
+            continue
+        relative_name = target.relative_to(root).as_posix().lower()
+        if pi_project and relative_name in ('start.cmd', 'start.sh'):
+            if result is not None:
+                raise ValueError('The managed Pi console is not an application launcher')
             continue
         if target.suffix.lower() not in LAUNCH_EXTENSIONS or target.stat().st_size > tracking.MAX_DOCUMENT:
             raise ValueError('Launch file must be a script up to 1 MiB')

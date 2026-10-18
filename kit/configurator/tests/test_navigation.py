@@ -39,7 +39,7 @@ class NavigationTests(unittest.TestCase):
         tab.go_to_role()
         self.window.update()
         self.assertEqual(self.selected(), ['exec'])
-        self.ui.vars['master_chief_source'].set('opencode')
+        self.ui.vars['master_chief_source'].set('pi')
         self.ui.on_save()
         self.window.update()
         self.assertEqual(self.selected(), ['master_chief'])

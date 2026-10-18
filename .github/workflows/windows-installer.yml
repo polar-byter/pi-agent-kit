@@ -1,31 +1,29 @@
-name: Windows installer
+name: Pi Kit on Windows
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - 'kit/**'
-      - 'install.*'
-      - 'AGENTS.md'
-      - '.github/workflows/windows-installer.yml'
+  pull_request:
 permissions:
   contents: read
 jobs:
-  pinned-runtime:
+  kit-tests:
     runs-on: windows-2022
     env:
-      OPENCODE_KIT_DASHBOARD: 'off'
+      PI_KIT_RUNTIME_HOME: '${{ runner.temp }}\pi-kit-python'
+      PI_KIT_NATIVE_SMOKE: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
-      - name: Bootstrap without a Python launcher
-        env:
-          OPENCODE_KIT_RUNTIME_HOME: '${{ runner.temp }}\opencode-kit-runtimes'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prepare the pinned private Python runtime
         run: .\kit\python.cmd --kit-runtime-path
-      - name: Verify native entry points and real Tk
-        env:
-          OPENCODE_KIT_RUNTIME_HOME: '${{ runner.temp }}\opencode-kit-runtimes'
+      - name: Install the pinned project-local Pi runtime
+        run: .\kit\python.cmd -B -c "from pathlib import Path; from kit.pi_installation import install_pi_runtime; install_pi_runtime(Path.cwd())"
+      - name: Run kit, configurator, dashboard and native Pi checks
         run: |
-          .\kit\python.cmd -m kit.task_metrics start --task windows-installer --title 'Windows pinned runtime' --no-dashboard
-          .\kit\python.cmd -m kit.task_metrics test --task windows-installer --scope bootstrap -- .\kit\python.cmd -m unittest kit.tests.test_python_runtime -v
+          .\kit\python.cmd -B -u -m kit.test_completed
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\kit\python.cmd -m kit.task_metrics test --task windows-installer --scope installer -- .\kit\python.cmd -m kit.tests.windows_runtime_smoke -v

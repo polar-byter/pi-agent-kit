@@ -20,7 +20,7 @@ class PythonRuntimeTests(unittest.TestCase):
         self.runtime = self.home / 'kit with spaces' / 'runtime'
         shutil.copytree(ROOT / 'kit/runtime', self.runtime)
         self.cache = self.home / 'runtime cache'
-        self.env = dict(os.environ, OPENCODE_KIT_RUNTIME_HOME=str(self.cache))
+        self.env = dict(os.environ, OPENCODE_KIT_RUNTIME_HOME=str(self.cache), PI_KIT_RUNTIME_HOME=str(self.cache))
 
     def run_bootstrap(self, *, fake_download=None):
         if os.name == 'nt':

@@ -196,7 +196,7 @@
     element('cancel-task').disabled = pending || !session || !['running', 'halted', 'paused', 'error'].includes(state);
     element('delete-task').disabled = pending || !data || state === 'deleted' || (!session && state !== 'finished');
     element('control-message').textContent = t(data?.control?.error || controlFailure || (pending ?
-      (['pausing', 'resuming', 'cancelling', 'deleting'].includes(state) ? labels()[state] : t("Sending action…")) : data?.control?.message || ''));
+      (['pausing', 'resuming', 'cancelling', 'deleting'].includes(state) ? labels()[state] : t("Sending action…")) : (state === 'finished' ? '' : data?.control?.message || '')));
   }
   async function controlTask(action) {
     const task = activeTask;
@@ -334,7 +334,7 @@
         const row = document.createElement('tr'), name = document.createElement('td');
         name.textContent = model.provider + '/' + model.model;
         const role = document.createElement('span'); role.className = 'muted';
-        const roles = (model.roles || []).map(value => value === 'master_chief' ? 'Master Chief' : t("Executor"));
+        const roles = (model.roles || []).map(value => value === 'master_chief' ? 'Master Chief' : value === 'bug_fixer' ? 'Bug Fixer' : t("Executor"));
         role.textContent = tr`${roles.join(' / ') || t("Role unknown")} · messages: ${formatCount(model.messages)}`;
         name.append(role); row.append(name);
         for (const field of Object.keys(tokenFields())) {

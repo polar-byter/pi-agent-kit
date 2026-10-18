@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from kit.configurator import app, desktop, openrouter
 from kit.configurator.tests.test_openrouter import row, snapshot
-from kit import run_opencode
+from kit import pi_configuration
 
 
 class DesktopTests(unittest.TestCase):
@@ -72,7 +72,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(widgets['key_hint'].winfo_manager(),'grid')
         self.assertEqual(self.ui.typed_keys['exec'].get(),'')
         self.assertNotIn('private-registry-key',widgets['key_status'].get())
-        self.assertFalse((self.root/'.opencode').exists())
+        self.assertFalse((self.root/'.pi').exists())
 
     def test_typed_replacement_hides_saved_placeholder_and_clear_restores_it(self):
         self.ui.vars['exec_source'].set('api')
@@ -147,7 +147,7 @@ class DesktopTests(unittest.TestCase):
         with patch.object(desktop.workflow.keys, 'save_user_variable') as save:
             self.assertTrue(self.ui.on_save())
         save.assert_called_once()
-        text = (self.root / '.opencode/kit-models.json').read_text()
+        text = (self.root / '.pi/kit-models.json').read_text()
         self.assertNotIn('secret-for-tests', text)
         self.assertEqual(json.loads(text)['executors']['model'], 'my-model')
         self.assertEqual(self.ui.typed_keys['exec'].get(), '')
@@ -165,7 +165,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.ui.notebook.select(), str(self.ui.pages['master_chief']))
         self.assertTrue(self.ui.advanced['master_chief'].get())
         self.assertIn('переменной', self.ui.status.get())
-        self.assertFalse((self.root / '.opencode').exists())
+        self.assertFalse((self.root / '.pi').exists())
 
     def test_inactive_typed_key_is_never_persisted(self):
         self.ui.typed_keys['exec'].set('hidden-secret')
@@ -229,7 +229,7 @@ class DesktopTests(unittest.TestCase):
         self.assertIn('оставлены', self.ui.status.get())
 
     def test_preparation_is_explicit_and_does_not_reload_current_session(self):
-        form = {'source': 'opencode', 'model': 'provider/model'}
+        form = {'source': 'pi', 'model': 'provider/model'}
         self.ui.vars['exec_source'].set(form['source'])
         self.ui.vars['exec_model'].set(form['model'])
         with patch.object(desktop.workflow, 'prepare', return_value=(0, 'secret-output')) as prepare:
@@ -243,7 +243,7 @@ class DesktopTests(unittest.TestCase):
         self.assertNotIn('disabled', self.ui.save_button.state())
 
     def test_malformed_saved_file_is_not_overwritten_on_open(self):
-        path = self.root / '.opencode/kit-models.json'
+        path = self.root / '.pi/kit-models.json'
         path.parent.mkdir()
         for text in ('broken json', '{"executors":{"source":"magic"}}', '{"executors":null}'):
             path.write_text(text)
@@ -284,7 +284,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.ui.vars['exec_key_env'].get(), 'OPENROUTER_API_KEY')
         self.assertEqual(self.ui.typed_keys['exec'].get(), '')
         self.assertEqual(other_before, {name: var.get() for name, var in self.ui.vars.items() if name.startswith('master_chief_')})
-        self.assertFalse((self.root / '.opencode').exists())
+        self.assertFalse((self.root / '.pi').exists())
         self.assertTrue(self.ui.dirty.get())
 
     def test_catalog_master_chief_selection_preserves_existing_openrouter_key_draft(self):
@@ -343,19 +343,25 @@ class DesktopTests(unittest.TestCase):
         with patch.object(desktop.workflow.keys, 'save_user_variable') as save:
             self.assertTrue(self.ui.on_save())
             save.assert_called_once_with('OPENROUTER_API_KEY', 'one-openrouter-key')
-        choices = json.loads((self.root / '.opencode/kit-models.json').read_text())
+        choices = json.loads((self.root / '.pi/kit-models.json').read_text())
         for role in ('masterChief', 'executors'):
             self.assertEqual(choices[role], {'source': 'api', 'baseURL': openrouter.API_URL,
                             'model': 'author/coder', 'keyEnv': 'OPENROUTER_API_KEY'})
-        (self.root / 'opencode.jsonc').write_text('{"model":"original/model"}')
-        with patch.dict(os.environ, {'OPENROUTER_API_KEY': 'one-openrouter-key'}):
-            self.assertIsNone(run_opencode.prepare(self.root))
-        overlay = (self.root / '.opencode/opencode.jsonc').read_text()
-        generated = json.loads(overlay[len(run_opencode.HEADER):])
-        self.assertEqual(generated['model'], 'kit-master-chief-api/author/coder')
-        self.assertEqual(generated['agents']['executor']['model'], 'kit-executor-api/author/coder')
-        self.assertEqual(generated['providers']['kit-executor-api']['settings']['baseURL'], openrouter.API_URL)
-        self.assertNotIn('one-openrouter-key', overlay)
+        prompts = self.root / 'kit/prompts'
+        prompts.mkdir(parents=True)
+        for name in ('master-chief.md', 'executor.md', 'executor-fast.md', 'bug-fixer.md'):
+            (prompts / name).write_text('Role prompt', encoding='utf-8')
+        with patch.object(desktop.workflow, 'existing_key', return_value='one-openrouter-key'):
+            self.assertIsNone(pi_configuration.write_prepared_pi_configuration(self.root))
+        runtime_text = (self.root / '.pi/kit-runtime.json').read_text()
+        runtime = json.loads(runtime_text)
+        models_text = (self.root / '.pi/agent/models.json').read_text()
+        providers = json.loads(models_text)['providers']
+        self.assertEqual(runtime['roles']['build']['provider'], 'kit-master-chief-api')
+        self.assertEqual(runtime['roles']['build']['model'], 'author/coder')
+        self.assertEqual(runtime['roles']['executor']['provider'], 'kit-executor-api')
+        self.assertEqual(providers['kit-executor-api']['baseUrl'], openrouter.API_URL)
+        self.assertNotIn('one-openrouter-key', models_text + runtime_text)
 
     def test_catalog_cache_is_available_when_refresh_fails(self):
         tab = self.ui.catalog

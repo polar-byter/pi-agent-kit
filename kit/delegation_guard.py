@@ -13,7 +13,7 @@ from pathlib import Path
 # Generated directories only. Source code must not be placed in these directories:
 # they are excluded from the snapshot, so edits inside them are never detected.
 # It is a way to exclude files that are not source files, and to avoid false positives in the snapshot.
-GENERATED = {'.git', '.metrics', '__pycache__', '.venv', 'node_modules', 'target', 'build', 'dist', 'bin', 'obj'}
+GENERATED = {'.git', '.metrics', '.tools', '.pi', '__pycache__', '.venv', 'node_modules', 'target', 'build', 'dist', 'bin', 'obj'}
 
 
 def normalize_delegated_path(root: Path, name: str) -> str:

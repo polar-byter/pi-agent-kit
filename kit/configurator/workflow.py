@@ -85,19 +85,19 @@ def validate(form: dict, typed_keys: dict[str, str]) -> tuple[dict, dict[str, st
                 supplied[name] = typed
     for role in ROLES:
         source = cleaned[role + '_source']
-        allowed = (('default', 'opencode', 'api') if role == 'master_chief' else
-                   ('disabled', 'opencode', 'api') if role == 'bug_fixer' else ('lmstudio', 'opencode', 'api'))
+        allowed = (('default', 'pi', 'api') if role == 'master_chief' else
+                   ('disabled', 'pi', 'api') if role == 'bug_fixer' else ('lmstudio', 'pi', 'api'))
         if source not in allowed:
             raise FormError(role, 'source', 'Choose a model connection type.')
-        if source in ('api', 'opencode'):
+        if source in ('api', 'pi'):
             model = cleaned[role + '_model']
             if not model:
                 raise FormError(role, 'model', 'Select a model or enter its exact ID.')
-            if source == 'opencode':
+            if source == 'pi':
                 try:
-                    models_choices_configurator.master_chief_from_opencode(model)
+                    models_choices_configurator.master_chief_from_pi(model)
                 except ValueError:
-                    raise FormError(role, 'model', 'OpenCode requires the full provider/model ID.') from None
+                    raise FormError(role, 'model', 'Pi requires the full provider/model ID.') from None
         if source == 'api':
             typed = typed_keys.get(role, '').strip()
             url, key = connection(cleaned, role, typed or supplied.get(cleaned[role + '_key_env'], ''))
@@ -136,8 +136,8 @@ def model_error(source: str, error: Exception) -> str:
     """Explain common discovery failures without echoing URLs, keys or server bodies."""
     if source == 'lmstudio':
         return 'LM Studio did not respond. Start its server and load a model in LM Studio.'
-    if source == 'opencode':
-        return 'Could not fetch models. Check that OpenCode is installed and available.'
+    if source == 'pi':
+        return 'Could not fetch models. Check that Pi is installed and available.'
     reason = error
     for _ in range(6):
         if isinstance(reason, HTTPError):

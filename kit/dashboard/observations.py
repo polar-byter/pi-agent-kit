@@ -27,8 +27,15 @@ class ObservedMetrics(TaskMetrics):
 
 def display_models(root: Path) -> dict:
     """Configured references only, not proof of what a session actually used."""
-    from ..configurator.models_choices_configurator import load_choices
-    choices = load_choices(root)
+    from ..runtime_selection import uses_pi_runtime
+    if uses_pi_runtime(root):
+        choices_path = root / '.pi/kit-models.json'
+    else:
+        choices_path = root / '.opencode/kit-models.json'
+    # Display saved references even when a provider key is not available yet.
+    choices = json.loads(choices_path.read_text(encoding='utf-8-sig')) if choices_path.is_file() else {}
+    if not isinstance(choices, dict):
+        raise ValueError('Saved model choices must contain an object')
     result = {}
     for role, field in (('master_chief', 'masterChief'), ('executor', 'executors'), ('bug_fixer', 'bugFixer')):
         choice = choices.get(field)
@@ -61,12 +68,25 @@ def token_view(events: list[dict], live: dict) -> dict:
         raise ValueError('Too many token rows')
     rows = []
     actual = live.get('models', {})
+    session_roles = {events[0].get('session'): 'master_chief'} if events[0].get('session') else {}
+    for event in events:
+        if event.get('kind') == 'attempt_session' and event.get('session'):
+            session_roles[event['session']] = 'bug_fixer' if event.get('role') == 'bug_fixer' else 'executor'
+    observed_roles = {}
+    for session_usage in raw.get('session_usage', []):
+        if not isinstance(session_usage, dict) or session_usage.get('session') not in session_roles:
+            continue
+        provider, model = session_usage.get('provider'), session_usage.get('model')
+        if isinstance(provider, str) and isinstance(model, str):
+            observed_roles.setdefault(provider + '/' + model, set()).add(session_roles[session_usage['session']])
     for row in raw['models']:
         if not isinstance(row, dict) or any(not isinstance(row.get(key), str) or not row[key] or len(row[key]) > 250 for key in ('provider', 'model')):
             raise ValueError('Invalid token model')
         result = {key: row[key] for key in ('provider', 'model')}
         reference = row['provider'] + '/' + row['model']
-        result['roles'] = [role for role in ('master_chief', 'executor') if reference in actual.get(role, [])]
+        result['roles'] = [role for role in ('master_chief', 'executor', 'bug_fixer')
+                           if (role in observed_roles[reference] if reference in observed_roles
+                               else reference in actual.get(role, []))]
         for field in (*TOKEN_FIELDS, 'messages', 'missing_usage'):
             value = row.get(field)
             result[field] = value if type(value) is int and value >= 0 else None

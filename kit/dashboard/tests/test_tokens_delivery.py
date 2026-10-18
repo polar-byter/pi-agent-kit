@@ -56,6 +56,20 @@ class TokenData(unittest.TestCase):
         self.events.append({'kind': 'finish', 'at': 130})
         self.assertFalse(observations.token_view(self.events, self.live)['available'])
 
+    def test_attempt_bindings_distinguish_fixer_usage_from_executor_usage(self):
+        self.events[0]['session'] = 'root'
+        self.events.extend([
+            {'kind': 'attempt_session', 'session': 'worker', 'role': 'executor'},
+            {'kind': 'attempt_session', 'session': 'fixer', 'role': 'bug_fixer'}])
+        self.live['models']['executor'] = ['provider/shared']
+        self.live['usage']['models'] = [usage_row('shared')]
+        self.live['usage']['session_usage'] = [dict(session='fixer', provider='provider', model='shared')]
+        roles = observations.token_view(self.events, self.live)['models'][0]['roles']
+        self.assertEqual(roles, ['bug_fixer'])
+        self.live['usage']['session_usage'].append(dict(session='worker', provider='provider', model='shared'))
+        roles = observations.token_view(self.events, self.live)['models'][0]['roles']
+        self.assertEqual(roles, ['executor', 'bug_fixer'])
+
     def test_shared_actual_model_lists_both_roles(self):
         self.live['models']['executor'] = ['provider/master']
         self.assertEqual(observations.token_view(self.events, self.live)['models'][0]['roles'], ['master_chief', 'executor'])
@@ -140,6 +154,34 @@ class DeliveryData(unittest.TestCase):
         data = delivery.completion(self.root, 'task', self.events)
         self.assertEqual(data['launcher']['name'], 'tools/my start.py')
         self.assertEqual(data['launcher']['url'], '/launch-file?task=task')
+
+    def test_pi_console_is_not_inferred_as_an_application_launcher(self):
+        (self.root / 'pi-kit.json').write_text(json.dumps({'runtime': 'pi'}), encoding='utf-8')
+        for name in ('start.cmd', 'start.sh'):
+            (self.root / name).write_text('Pi kit console', encoding='utf-8')
+        self.assertIsNone(delivery.launch_file(self.root, 'task'))
+        (self.root / 'run.cmd').write_text('Application launcher', encoding='utf-8')
+        self.assertEqual(delivery.launch_file(self.root, 'task').name, 'run.cmd')
+
+    def test_pi_project_publishes_its_explicit_nested_application_launcher(self):
+        (self.root / 'pi-kit.json').write_text(json.dumps({'runtime': 'pi'}), encoding='utf-8')
+        (self.root / 'start.cmd').write_text('Pi kit console', encoding='utf-8')
+        (self.root / 'game').mkdir()
+        (self.root / 'game/play.cmd').write_text('Application launcher', encoding='utf-8')
+        progress = self.metrics.task_dir('task') / 'progress'
+        progress.mkdir()
+        (progress / 'result.json').write_text(json.dumps({'launcher': 'game/play.cmd'}), encoding='utf-8')
+        self.assertEqual(delivery.completion(self.root, 'task', self.events)['launcher']['name'], 'game/play.cmd')
+
+    def test_pi_console_is_rejected_when_explicitly_registered_as_a_result(self):
+        (self.root / 'pi-kit.json').write_text(json.dumps({'runtime': 'pi'}), encoding='utf-8')
+        progress = self.metrics.task_dir('task') / 'progress'
+        progress.mkdir()
+        for name in ('start.cmd', 'start.sh'):
+            (self.root / name).write_text('Pi kit console', encoding='utf-8')
+            (progress / 'result.json').write_text(json.dumps({'launcher': name}), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'not an application launcher'):
+                delivery.launch_file(self.root, 'task')
 
     def test_unsafe_explicit_launcher_never_becomes_a_link(self):
         folder = self.metrics.task_dir('task') / 'progress'; folder.mkdir()

@@ -9,15 +9,20 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
+from pathlib import Path
 
 if __package__:
     from .journal import session_id, valid_number
     from .opencode_cli import locate_opencode
     from .suite_runner import CATEGORY_NO_RESULT, CATEGORY_TIMEOUT
+    from .runtime_selection import uses_pi_runtime
 else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from journal import session_id, valid_number
     from opencode_cli import locate_opencode
     from suite_runner import CATEGORY_NO_RESULT, CATEGORY_TIMEOUT
+    from runtime_selection import uses_pi_runtime
 
 TOKEN_FIELDS = ('input', 'output', 'reasoning', 'cache_read', 'cache_write')
 
@@ -206,6 +211,9 @@ class UsageReportMixin:
 
     def export_session(self, executable: str, sid: str) -> dict:
         """Export one session, trying the newer CLI command before the legacy one."""
+        if uses_pi_runtime(self.root):
+            from kit.runtimes.pi_gateway import PiSessionControl
+            return PiSessionControl(self.root).export_session(sid)
         try:
             export = self.cli_json(executable, ['session', 'export', sid])
         except ValueError:
@@ -243,6 +251,9 @@ class UsageReportMixin:
     # collect OpenCode exports for a session and its children, using the CLI to fetch data and handling pagination and errors
     def collect_exports(self, session: str, executable: str = 'opencode') -> list[dict]:
         session_id(session)
+        if uses_pi_runtime(self.root):
+            from kit.runtimes.pi_gateway import collect_session_exports
+            return collect_session_exports(self.root, session)
         executable = resolve_opencode(executable)
         queue, seen, exports = [session], set(), []
         while queue:

@@ -26,6 +26,12 @@ from .quota_monitor import QuotaMonitor
 PAGE = Path(__file__).resolve().parent / 'static' / 'runtime.html'
 
 
+def dashboard_display_text(root: Path, source: str) -> str:
+    """Use the selected runtime name only in trusted interface source strings."""
+    from ..runtime_selection import uses_pi_runtime
+    return source.replace('OpenCode', 'Pi') if uses_pi_runtime(root) else source
+
+
 def task_directory(root: Path, task: str) -> Path:
     directory = TaskMetrics(root).task_dir(task)
     if directory.resolve().parent != (root / '.metrics').resolve():
@@ -232,14 +238,15 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(parts.query, keep_blank_values=True)
         try:
             if parts.path == '/':
-                body = PAGE.read_bytes()
+                body = dashboard_display_text(self.server.root, PAGE.read_text(encoding='utf-8')).encode('utf-8')
                 status, content_type = 200, 'text/html; charset=utf-8'
             elif parts.path == '/localization.js':
                 body = PAGE.with_name('localization.js').read_bytes()
                 status, content_type = 200, 'text/javascript; charset=utf-8'
             elif parts.path == '/api/i18n':
                 body = json.dumps({'saved_language': localization.saved_language(self.server.root),
-                                   'catalog': localization.catalog()}, ensure_ascii=False).encode('utf-8')
+                                   'catalog': {dashboard_display_text(self.server.root, key): dashboard_display_text(self.server.root, value)
+                                               for key, value in localization.catalog().items()}}, ensure_ascii=False).encode('utf-8')
                 status, content_type = 200, 'application/json; charset=utf-8'
             elif parts.path == '/api/health':
                 body = json.dumps(self.server.health(), ensure_ascii=False).encode('utf-8')

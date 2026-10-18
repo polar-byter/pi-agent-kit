@@ -48,7 +48,7 @@ class DesktopConfigurator:
         self.poll_id = self.window.after(70, self.poll)
 
     def configure_style(self):
-        self.window.title('Project models — OpenCode Kit')
+        self.window.title('Project models — Pi Kit')
         self.window_icons = icons.application(self.window)
         self.window.configure(background=BG)
         self.window.geometry('940x820')
@@ -118,11 +118,11 @@ class DesktopConfigurator:
         actions.grid(row=1, column=0, sticky='ew')
         self.save_button = ttk.Button(actions, text='Save settings', style='Primary.TButton', command=self.on_save)
         self.save_button.pack(side='left')
-        self.prepare_button = ttk.Button(actions, text='Prepare OpenCode', command=self.on_prepare)
+        self.prepare_button = ttk.Button(actions, text='Prepare Pi', command=self.on_prepare)
         self.prepare_button.pack(side='left', padx=8)
         self.reset_button = ttk.Button(actions, text='Restore defaults', command=self.on_reset)
         self.reset_button.pack(side='right')
-        ttk.Label(footer, text='Save selects models for the next kit launch. Prepare builds the configuration now.\nThe current OpenCode session is not switched automatically.', style='Muted.TLabel',
+        ttk.Label(footer, text='Save selects models for the next kit launch. Prepare builds the configuration now.\nThe current Pi session is not switched automatically.', style='Muted.TLabel',
                   wraplength=850).grid(row=2, column=0, sticky='w', pady=(10, 7))
         self.status_label = ttk.Label(footer, textvariable=self.status, wraplength=850, justify='left')
         self.status_label.grid(row=3, column=0, sticky='ew')
@@ -197,7 +197,7 @@ class DesktopConfigurator:
             self.capture_text(child)
 
     def localize(self):
-        self.window.title(self.tr('Project models — OpenCode Kit'))
+        self.window.title(self.tr('Project models — Pi Kit'))
         for widget, source in self.text_bindings:
             widget.configure(text=self.tr(source))
         for role, page in self.pages.items():
@@ -273,19 +273,19 @@ class DesktopConfigurator:
         source_bar.grid(row=2, column=0, sticky='ew', pady=(0, 8))
         first = (('default', 'Project defaults') if role == 'master_chief' else
                  ('disabled', 'Disabled') if role == 'bug_fixer' else ('lmstudio', 'Local · LM Studio'))
-        for index, (value, text) in enumerate((first, ('opencode', 'Model from OpenCode'), ('api', 'Own API'))):
+        for index, (value, text) in enumerate((first, ('pi', 'Model from Pi'), ('api', 'Own API'))):
             ttk.Radiobutton(source_bar, text=text, variable=self.vars[role + '_source'], value=value).grid(
                 row=0, column=index, sticky='w', padx=(0, 22))
         panels = {}
         self.widgets[role] = {'panels': panels, 'fields': {}}
-        for source in ('default', 'lmstudio', 'opencode', 'api', 'disabled'):
+        for source in ('default', 'lmstudio', 'pi', 'api', 'disabled'):
             panel = ttk.Frame(page, style='Card.TFrame')
             panel.grid(row=3, column=0, sticky='nsew')
             panel.columnconfigure(0, weight=1)
             panels[source] = panel
         ttk.Label(panels['default'], text='The model from the project configuration will be used.',
                   style='Card.TLabel').grid(sticky='w', pady=(12, 7))
-        ttk.Label(panels['default'], text='Choose OpenCode or connect your own API to use another model.',
+        ttk.Label(panels['default'], text='Choose Pi or connect your own API to use another model.',
                   style='Hint.TLabel').grid(sticky='w')
         local = panels['lmstudio']
         ttk.Label(local, text='Loaded model', style='Card.TLabel').grid(sticky='w', pady=(8, 5))
@@ -294,13 +294,13 @@ class DesktopConfigurator:
         ttk.Button(local, text='Refresh list', command=lambda: self.fetch(role)).grid(row=1, column=1, padx=(10, 0))
         ttk.Label(local, text='Load a model in LM Studio first. Leave blank to select the only loaded model.\nThis utility does not load or unload models.', style='Hint.TLabel',
                   wraplength=650).grid(row=2, column=0, columnspan=2, sticky='w', pady=(8, 0))
-        connected = panels['opencode']
-        ttk.Label(connected, text='OpenCode model', style='Card.TLabel').grid(sticky='w', pady=(8, 5))
+        connected = panels['pi']
+        ttk.Label(connected, text='Pi model', style='Card.TLabel').grid(sticky='w', pady=(8, 5))
         combo = ttk.Combobox(connected, textvariable=self.vars[role + '_model'])
         combo.grid(row=1, column=0, sticky='ew')
         ttk.Button(connected, text='Get models', command=lambda: self.fetch(role)).grid(row=1, column=1, padx=(10, 0))
-        self.widgets[role]['opencode_model'] = combo
-        ttk.Label(connected, text='Connections already known to OpenCode. Use the full provider/model ID.\nFetch the list or enter the ID manually.', style='Hint.TLabel',
+        self.widgets[role]['pi_model'] = combo
+        ttk.Label(connected, text='Connections already known to Pi. Use the full provider/model ID.\nFetch the list or enter the ID manually.', style='Hint.TLabel',
                   wraplength=650).grid(row=2, column=0, columnspan=2, sticky='w', pady=(8, 0))
         self.build_api(role, panels['api'])
         activity = self.translator.var()
@@ -409,21 +409,13 @@ class DesktopConfigurator:
     def load(self):
         try:
             data = models_choices_configurator.load_choices(self.root)
-            if not data and (self.root / 'opencode.jsonc').is_file():
-                from ..run_opencode import strip_jsonc
-                import json
-                config = json.loads(strip_jsonc((self.root / 'opencode.jsonc').read_text(encoding='utf-8-sig')))
-                agents = config.get('agents', {})
-                executor_model = agents.get('executor', {}).get('model', '')
-                if executor_model and not executor_model.startswith('lmstudio/'):
-                    data['executors'] = {'source': 'opencode', 'model': executor_model}
-                fixer = agents.get('bug-fixer', {})
-                if fixer.get('disabled') is False:
-                    data['bugFixer'] = {'source': 'opencode', 'model': fixer['model']}
+            from ..pi_configuration import load_project_defaults
+            defaults = load_project_defaults(self.root)
+            data = {**defaults, **data}
             form = app.choices_to_form(data)
             for section in ('masterChief', 'executors', 'bugFixer'):
                 if section in data:
-                    allowed = ('opencode', 'api') if section == 'masterChief' else ('lmstudio', 'opencode', 'api')
+                    allowed = ('pi', 'api') if section == 'masterChief' else ('lmstudio', 'pi', 'api')
                     if not isinstance(data[section], dict) or data[section].get('source') not in allowed:
                         raise ValueError('Invalid choice source')
             for name, value in form.items():
@@ -443,7 +435,7 @@ class DesktopConfigurator:
         if not self.busy[role]:
             self.widgets[role]['activity'].set('')
         self.widgets[role]['fields']['model']['values'] = ()
-        self.widgets[role]['opencode_model']['values'] = ()
+        self.widgets[role]['pi_model']['values'] = ()
         self.render(role)
         for other in workflow.ROLES:
             if (other != role and self.vars[other + '_source'].get() == 'api'
@@ -527,8 +519,8 @@ class DesktopConfigurator:
                 self.advanced[error.role].set(True)
                 self.toggle_advanced(error.role)
             widget = self.widgets[error.role]['fields'].get(error.field)
-            if error.field == 'model' and self.vars[error.role + '_source'].get() == 'opencode':
-                widget = self.widgets[error.role]['opencode_model']
+            if error.field == 'model' and self.vars[error.role + '_source'].get() == 'pi':
+                widget = self.widgets[error.role]['pi_model']
             if widget:
                 widget.focus_set()
             self.status.set('{role}: {message}', role=i18n.text(workflow.ROLE_NAMES[error.role]),
@@ -550,8 +542,8 @@ class DesktopConfigurator:
                     typed = self.typed_keys[other].get()
                 arguments = workflow.connection(form, role, typed)
                 fetcher = sources.api_models
-            elif source == 'opencode':
-                arguments, fetcher = (), sources.opencode_models
+            elif source == 'pi':
+                arguments, fetcher = (self.root,), sources.pi_models
             elif source == 'lmstudio':
                 arguments, fetcher = (), sources.lmstudio_instances
             else:
@@ -664,7 +656,7 @@ class DesktopConfigurator:
             else:
                 activity.set('No models are loaded. Load a model in LM Studio and refresh the list.')
         else:
-            combo = self.widgets[role]['fields']['model'] if source == 'api' else self.widgets[role]['opencode_model']
+            combo = self.widgets[role]['fields']['model'] if source == 'api' else self.widgets[role]['pi_model']
             combo['values'] = models
             if models:
                 activity.set('Found {count} models. Choose one from the list.', count=len(models))
@@ -706,7 +698,7 @@ class DesktopConfigurator:
         for button in (self.save_button, self.prepare_button, self.reset_button):
             button.state(['disabled'])
         self.status_label.configure(foreground=INK)
-        self.status.set('Preparing OpenCode settings… The current session is not being restarted.')
+        self.status.set('Preparing Pi settings… The current session is not being restarted.')
         choices = self.saved_choices
 
         def work():
@@ -725,7 +717,7 @@ class DesktopConfigurator:
             button.state(['!disabled'])
         self.status_label.configure(foreground='#187047' if successful else '#b42338')
         self.status.set('Settings prepared. Resume a paused task to use this selection; new sessions will use it too.' if successful else
-                        'Selection saved, but preparation failed. Check OpenCode, API keys, or the loaded LM Studio model. The current session was not changed.')
+                        'Selection saved, but preparation failed. Check Pi, API keys, or the loaded LM Studio model. The current session was not changed.')
         if successful and self.on_prepared:
             self.on_prepared()
 

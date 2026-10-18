@@ -1,7 +1,7 @@
-"""Model configurator: a small window that chooses models for the Master Chief and the executors.
+r"""Model configurator: a small window that chooses models for the Master Chief and the executors.
 
-The configurator writes only .opencode/kit-models.json. kit/run_opencode.py reads that
-file and builds the OpenCode overlay. Run from the project root:
+The configurator writes only .pi/kit-models.json. kit/run_pi.py reads that
+file and prepares the isolated Pi runtime. Run from the project root:
 
-    py -m kit.configurator.app
+    kit\python.cmd -m kit.configurator.app
 """

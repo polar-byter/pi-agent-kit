@@ -21,6 +21,7 @@ from .task_metrics import TaskMetrics, pending_attempts, message_info, is_halted
 from .dashboard.session_control import SessionControl
 from .task_control_state import blocking_reason, plain_path
 from .provider_limits import quota_error
+from .runtime_selection import create_session_gateway, load_project_model_choices, uses_pi_runtime
 
 
 def worker_permissions(root, workspace, source, progress):
@@ -44,6 +45,27 @@ def worker_permissions(root, workspace, source, progress):
     ]
 
 
+def find_worker_test_files(workspace, source):
+    """Find existing test files near the assigned source inside its private copy.
+
+    A nested application can keep its tests below the project root. Give the
+    worker exact file paths because Pi's read tool cannot read a directory.
+    """
+    workspace = plain_path(Path(workspace).resolve())
+    source_directory = plain_path(workspace / source).parent
+    for directory in (source_directory, *source_directory.parents):
+        if not directory.is_relative_to(workspace):
+            break
+        for name in ('tests', 'test'):
+            test_directory = plain_path(directory / name)
+            if not test_directory.is_dir():
+                continue
+            test_files = [plain_path(path) for path in sorted(test_directory.rglob('*')) if path.is_file()]
+            if test_files:
+                return test_files
+    return []
+
+
 class ExecutionController:
     """One task, bounded worker slots, isolated edits and serialized integration."""
 
@@ -51,7 +73,7 @@ class ExecutionController:
         self.root = Path(root).resolve()
         self.task = task
         self.metrics = TaskMetrics(self.root)
-        self.service = service or SessionControl(self.root)
+        self.service = service or create_session_gateway(self.root)
         self.start_watcher = watcher or self.spawn_watch
 
     def spawn_watch(self, identifier):
@@ -100,9 +122,11 @@ class ExecutionController:
                     from .model_switch import revision
                     choices = revision(self.root, self.task, selected)['choices']
             else:
-                choices = load_choices(self.root)
+                choices = load_project_model_choices(self.root)
                 choices['execution'] = normalize_policy(choices.get('execution'))
                 if choices.get('executors') is None:
+                    if uses_pi_runtime(self.root):
+                        raise ValueError('Choose an executor model in the project settings before dispatching work.')
                     config = json.loads(strip_jsonc((self.root / 'opencode.jsonc').read_text(encoding='utf-8')))
                     reference = config['agents']['executor']['model']
                     choices['executors'] = ({'source': 'lmstudio'} if reference.startswith('lmstudio/')
@@ -156,7 +180,7 @@ class ExecutionController:
         events = self.metrics.read_events_if_work_allowed(self.task)
         if work_item == 'full':
             raise ValueError('full is reserved for final root-project tests')
-        if events[0].get('server_mode') in ('standalone', 'unknown'):
+        if events[0].get('server_mode') in ('standalone', 'unknown') and not uses_pi_runtime(self.root):
             raise ValueError('Isolated supervision requires the shared Desktop service; private sessions are not rebound automatically. '
                              'Continue sequentially: delegate one work item at a time to the executor subagent')
         if not events[0].get('session'):
@@ -174,7 +198,7 @@ class ExecutionController:
         exhausted = budget_reason(counts, policy, role)
         if exhausted:
             raise ValueError(work_item + ': ' + exhausted)
-        if role == 'executor' and (counts['bug_fixer'] or counts['executor'] and choices.get('bugFixer')):
+        if role == 'executor' and (counts['bug_fixer'] or counts['executor'] and choices.get('bugFixer') and not previous):
             raise ValueError('Continue with the bug fixer; do not bounce back to the executor')
         accepted = {e.get('delegation_id') for e in events if e['kind'] == 'review' and e['result'] == 'accepted'}
         integrated = {e.get('delegation_id') for e in events if e['kind'] == 'integration'}
@@ -233,7 +257,10 @@ class ExecutionController:
         progress.parent.mkdir(exist_ok=True)
         agent = 'bug-fixer' if role == 'bug_fixer' else 'executor'
         selection = choices.get('bugFixer' if role == 'bug_fixer' else 'executors')
-        if selection and selection['source'] != 'lmstudio':
+        if uses_pi_runtime(self.root):
+            from .pi_configuration import resolve_role_model_references
+            reference = resolve_role_model_references(self.root, choices)['bugFixer' if role == 'bug_fixer' else 'executors']
+        elif selection and selection['source'] != 'lmstudio':
             reference = (('kit-bug-fixer-api/' if role == 'bug_fixer' else 'kit-executor-api/') + selection['model']
                          if selection['source'] == 'api' else selection['model'])
         else:
@@ -247,10 +274,14 @@ class ExecutionController:
         try:
             progress.write_text(json.dumps({'delegation_id': attempt['event_id'], 'implemented_ids': [],
                                            'current_id': None, 'updated_at': time.time()}, ensure_ascii=True), encoding='utf-8')
-            child = self.service.call('session.create', data={'parentID': events[0]['session'],
+            child_session_settings = {'parentID': events[0]['session'],
                 'title': f'{self.task}: {work_item} ({worker})', 'agent': agent,
                 'model': model_reference,
-                'permissions': worker_permissions(self.root, workspace, allowed, progress)})['data']
+                'permissions': worker_permissions(self.root, workspace, allowed, progress)}
+            if uses_pi_runtime(self.root):
+                child_session_settings.update(workspace=str(workspace), source=str(workspace / allowed),
+                                              progress=str(progress))
+            child = self.service.call('session.create', data=child_session_settings)['data']
             if (child.get('parentID') != events[0]['session'] or child.get('agent') != agent
                     or child.get('title') != f'{self.task}: {work_item} ({worker})'
                     or not child.get('location', {}).get('directory')
@@ -265,11 +296,12 @@ class ExecutionController:
             functions = json.loads(plan.read_text(encoding='utf-8')).get('functions', []) if plan.exists() else []
             ids = [f['id'] for f in functions if f['work_item'] == work_item]
             contract_files = [str(workspace / name) for name in attempt.get('contracts', [])]
+            test_files = find_worker_test_files(workspace, allowed)
             text = (f'# Work item: {work_item}\n'
                     f'## Exact paths (copy these; do not reconstruct directory IDs)\nWorkspace: {workspace}\n'
                     f'Source to read and edit: {workspace / allowed}\n'
                     f'Shared contracts to read: {"; ".join(contract_files)}\n'
-                    f'Tests to read, if needed: {workspace / "tests"}\n'
+                    f'Test files available to read: {"; ".join(str(path) for path in test_files) or "none found near this source"}\n'
                     f'Existing progress file to read and update: {progress}\n'
                     '## Boundaries\nRead the source and its spec comments first. You may read files inside this workspace, '
                     'including tests. Implement only function bodies in the assigned source. Do not edit tests, '

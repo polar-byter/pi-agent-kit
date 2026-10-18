@@ -39,7 +39,7 @@ class WorkflowTests(unittest.TestCase):
             with self.assertRaises(workflow.FormError) as caught:
                 workflow.save(Path(folder), form, {'master_chief': 'key-one', 'exec': 'key-two'})
             self.assertEqual(caught.exception.role, 'exec')
-            self.assertFalse((Path(folder) / '.opencode').exists())
+            self.assertFalse((Path(folder) / '.pi').exists())
             save.assert_not_called()
 
     def test_hidden_inactive_key_is_not_saved(self):
@@ -111,7 +111,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(workflow.api_address('HTTPS://api.example/v1'), 'https://api.example/v1')
 
     def test_opencode_names_keep_existing_contract(self):
-        form = dict(app.EMPTY_FORM, exec_source='opencode', exec_model='no-provider')
+        form = dict(app.EMPTY_FORM, exec_source='pi', exec_model='no-provider')
         with self.assertRaises(workflow.FormError) as caught:
             workflow.validate(form, {})
         self.assertEqual(caught.exception.field, 'model')

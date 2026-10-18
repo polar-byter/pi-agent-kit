@@ -68,6 +68,7 @@ if __package__:
                                master_chief_tool_child_references, message_info, message_model,
                                message_tokens, new_usage_row, resolve_opencode, text_or_unknown)
 else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from delegation_guard import (compare_project_snapshots, normalize_delegated_path, read_requirements,
                                   review_checks, take_project_snapshot)
     from journal import (KNOWN_EVENT_TYPES, WINDOWS_RESERVED, TaskJournal, corrected_events, normalize_work_item,
@@ -174,6 +175,9 @@ class TaskMetrics(TaskJournal, SuiteRunnerMixin, UsageReportMixin):
             # session=session puts the value into append's **data as the "session" key;
             # session_id(session) above has already validated it.
             server = {}
+            from kit.runtime_selection import uses_pi_runtime
+            if uses_pi_runtime(self.root):
+                server.update(runtime='pi', server_mode='managed')
             if os.environ.get('OPENCODE_KIT_ROOT') and Path(os.environ['OPENCODE_KIT_ROOT']).resolve() == self.root:
                 server['server_mode'] = os.environ.get('OPENCODE_KIT_SERVER_MODE', 'unknown')
             return self.append(task, 'start', session=session, title=title or task, limits=limits,
@@ -690,7 +694,8 @@ def main(argv=None) -> int:
             limits = {name: getattr(args, name) for name in DEFAULT_LIMITS}
             event = metrics.start(args.task, args.session, args.title, limits, args.track_delegations)
             if (not args.no_dashboard and os.environ.get('OPENCODE_KIT_DASHBOARD', '').lower() not in ('off', '0')
-                    and (metrics.root / 'opencode.jsonc').is_file() and (metrics.root / 'kit').is_dir()):
+                    and any((metrics.root / name).is_file() for name in ('opencode.jsonc', 'pi-kit.json'))
+                    and (metrics.root / 'kit').is_dir()):
                 try:
                     dashboard = launch_task_dashboard(metrics.root, args.task, not args.no_browser)
                     if not args.no_browser and not dashboard['opened']:

@@ -1,8 +1,7 @@
 """Lists of models the user can choose from.
 
 Three sources:
-- OpenCode itself: the command "opencode models" prints every model it can use
-  (OpenCode Go, a ChatGPT subscription connected with /connect, other providers);
+- Pi RPC: models available through the project agent directory and its environment;
 - an own OpenAI-compatible API: GET <baseURL>/models with the key;
 - LM Studio: instances that are already loaded (kit/lmstudio_models.py does the work).
 
@@ -18,6 +17,7 @@ import urllib.request
 import re
 import urllib.error
 from .. import lmstudio_models
+from ..pi_configuration import list_available_pi_models
 from ..run_opencode import find_opencode
 
 # this regex can be explained as: 
@@ -94,6 +94,14 @@ def opencode_models(command: str = 'opencode') -> list[str]:
     output_text = process_result.stdout
     
     return parse_opencode_models(output_text)
+
+def pi_models(root=None) -> list[str]:
+    """Read authenticated models from the project's isolated Pi directory."""
+    from pathlib import Path
+    project = Path(root) if root is not None else Path(__file__).resolve().parents[2]
+    return list_available_pi_models(project)
+
+
 
 def api_models(base_url: str, api_key: str) -> list[str]:
     """Ask an own API for its models: GET <base_url>/models with "Authorization: Bearer <key>".

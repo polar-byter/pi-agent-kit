@@ -9,43 +9,43 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from kit import run_opencode
+from kit import pi_configuration
 from kit.configurator import models_choices_configurator
 
 
 class Step1MasterChiefFromOpencode(unittest.TestCase):
     def test_returns_source_and_model(self):
-        self.assertEqual(models_choices_configurator.master_chief_from_opencode('openai/gpt-6.1-sol'),
-                         {'source': 'opencode', 'model': 'openai/gpt-6.1-sol'})
+        self.assertEqual(models_choices_configurator.master_chief_from_pi('openai/gpt-6.1-sol'),
+                         {'source': 'pi', 'model': 'openai/gpt-6.1-sol'})
 
     def test_strips_spaces(self):
-        self.assertEqual(models_choices_configurator.master_chief_from_opencode('  opencode-go/deepseek-v4.1-flash \n')['model'],
+        self.assertEqual(models_choices_configurator.master_chief_from_pi('  opencode-go/deepseek-v4.1-flash \n')['model'],
                          'opencode-go/deepseek-v4.1-flash')
 
     def test_model_without_provider_is_rejected(self):
         with self.assertRaises(ValueError):
-            models_choices_configurator.master_chief_from_opencode('deepseek')
+            models_choices_configurator.master_chief_from_pi('deepseek')
 
     def test_empty_model_is_rejected(self):
         for value in ('', '   '):
             with self.subTest(value=value), self.assertRaises(ValueError):
-                models_choices_configurator.master_chief_from_opencode(value)
+                models_choices_configurator.master_chief_from_pi(value)
 
 
 class ExecutorsFromOpencode(unittest.TestCase):
     def test_same_rules_as_master_chief(self):
-        self.assertEqual(models_choices_configurator.executors_from_opencode(' openrouter/qwen/qwen3-coder:free '),
-                         {'source': 'opencode', 'model': 'openrouter/qwen/qwen3-coder:free'})
+        self.assertEqual(models_choices_configurator.executors_from_pi(' openrouter/qwen/qwen3-coder:free '),
+                         {'source': 'pi', 'model': 'openrouter/qwen/qwen3-coder:free'})
         with self.assertRaises(ValueError):
-            models_choices_configurator.executors_from_opencode('qwen3-coder')
+            models_choices_configurator.executors_from_pi('qwen3-coder')
 
     def test_launcher_understands_it(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             choice = models_choices_configurator.build_choices(
-                None, models_choices_configurator.executors_from_opencode('a/b'))
+                None, models_choices_configurator.executors_from_pi('a/b'))
             models_choices_configurator.save_choices(root, choice)
-            self.assertEqual(run_opencode.load_choices(root)['executors'], {'source': 'opencode', 'model': 'a/b'})
+            self.assertEqual(pi_configuration.load_choices(root)['executors'], {'source': 'pi', 'model': 'a/b'})
 
 
 class Step1ApiChoice(unittest.TestCase):
@@ -92,7 +92,7 @@ class Step1BuildChoices(unittest.TestCase):
         self.assertEqual(models_choices_configurator.build_choices(None, None), {})
 
     def test_only_given_sections(self):
-        master_chief = {'source': 'opencode', 'model': 'a/b'}
+        master_chief = {'source': 'pi', 'model': 'a/b'}
         executors = {'source': 'lmstudio'}
         self.assertEqual(models_choices_configurator.build_choices(master_chief, None), {'masterChief': master_chief})
         self.assertEqual(models_choices_configurator.build_choices(None, executors), {'executors': executors})
@@ -110,7 +110,7 @@ class Step2File(unittest.TestCase):
         self.assertEqual(models_choices_configurator.load_choices(self.root), {})
 
     def test_save_creates_folder_and_returns_path(self):
-        data = {'masterChief': {'source': 'opencode', 'model': 'a/b'}}
+        data = {'masterChief': {'source': 'pi', 'model': 'a/b'}}
         self.assertEqual(models_choices_configurator.save_choices(self.root, data), self.path)
         self.assertTrue(self.path.is_file())
 
@@ -121,7 +121,7 @@ class Step2File(unittest.TestCase):
         self.assertEqual(models_choices_configurator.load_choices(self.root), data)
 
     def test_saved_text_is_readable(self):
-        models_choices_configurator.save_choices(self.root, {'masterChief': {'source': 'opencode', 'model': 'a/модель'}})
+        models_choices_configurator.save_choices(self.root, {'masterChief': {'source': 'pi', 'model': 'a/модель'}})
         text = self.path.read_text(encoding='utf-8')
         self.assertIn('модель', text)          # ensure_ascii=False
         self.assertIn('\n  "masterChief"', text)     # indent=2
@@ -132,7 +132,7 @@ class Step2File(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in self.path.parent.iterdir()), [self.path.name])
 
     def test_save_overwrites_previous(self):
-        models_choices_configurator.save_choices(self.root, {'masterChief': {'source': 'opencode', 'model': 'a/b'}})
+        models_choices_configurator.save_choices(self.root, {'masterChief': {'source': 'pi', 'model': 'a/b'}})
         models_choices_configurator.save_choices(self.root, {})
         self.assertEqual(models_choices_configurator.load_choices(self.root), {})
 
@@ -161,12 +161,12 @@ class Contract(unittest.TestCase):
                 models_choices_configurator.api_choice('https://api.example.com/v1', 'big', 'KIT_CONTRACT_KEY'),
                 models_choices_configurator.lmstudio_choice('qwen-1'))
             models_choices_configurator.save_choices(root, data)
-            loaded = run_opencode.load_choices(root)
+            loaded = pi_configuration.load_choices(root)
         self.assertEqual(loaded['masterChief']['model'], 'big')
         self.assertEqual(loaded['executors'], {'source': 'lmstudio', 'instance': 'qwen-1'})
 
     def test_same_file_location(self):
-        self.assertEqual(models_choices_configurator.CHOICES_PATH, Path('.opencode') / run_opencode.CHOICES_FILE)
+        self.assertEqual(models_choices_configurator.CHOICES_PATH, pi_configuration.CHOICES_PATH)
 
 
 if __name__ == '__main__':

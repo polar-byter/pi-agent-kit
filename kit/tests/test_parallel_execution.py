@@ -102,6 +102,32 @@ class ParallelExecutionTests(unittest.TestCase):
                                        'test': 'test_value', 'verified': True}]), encoding='utf-8')
         self.metrics.review('demo', name, 'accepted', checks)
 
+    def test_worker_prompt_names_existing_root_test_files(self):
+        attempt = self.launch('a')
+        workspace = self.metrics.attempt_root('demo', attempt)
+        prompt = self.service.prompts[-1]
+        self.assertIn(str(workspace / 'tests/test_a.py'), prompt)
+        self.assertNotIn('Tests to read, if needed:', prompt)
+
+    def test_worker_prompt_uses_test_files_next_to_a_nested_application(self):
+        (self.root / 'game/app').mkdir(parents=True)
+        (self.root / 'game/tests').mkdir()
+        (self.root / 'game/app/logic.js').write_text('function createGame() {}', encoding='utf-8')
+        (self.root / 'game/tests/logic.test.cjs').write_text('// Game rule tests.', encoding='utf-8')
+        attempt = self.controller.launch('nested', 'game/app/logic.js',
+            '.metrics/demo/a-requirements.json', ['CONTRACT.md'])
+        workspace = self.metrics.attempt_root('demo', attempt)
+        prompt = self.service.prompts[-1]
+        self.assertIn(str(workspace / 'game/tests/logic.test.cjs'), prompt)
+        self.assertNotIn(str(workspace / 'tests/test_a.py'), prompt)
+
+    def test_worker_prompt_does_not_invent_a_missing_test_directory(self):
+        for test_file in (self.root / 'tests').iterdir():
+            test_file.unlink()
+        (self.root / 'tests').rmdir()
+        self.launch('a')
+        self.assertIn('Test files available to read: none found near this source', self.service.prompts[-1])
+
     def test_two_isolated_workers_are_checked_and_integrated_independently(self):
         a, b = self.launch('a'), self.launch('b')
         self.assertNotEqual(a['worker_id'], b['worker_id'])
@@ -495,6 +521,18 @@ class ParallelExecutionTests(unittest.TestCase):
         self.metrics.inspect('demo', 'a')
         with self.assertRaisesRegex(ValueError, 'infrastructure'):
             self.metrics.review('demo', 'a', 'blocked')
+
+    def test_paused_executor_can_continue_with_a_configured_fixer(self):
+        self.choices['bugFixer'] = {'source': 'opencode', 'model': 'test/fixer'}
+        self.save_choices()
+        attempt = self.launch('a')
+        self.controller.stop(attempt['event_id'], 'paused')
+        self.metrics.inspect('demo', 'a')
+        self.metrics.review('demo', 'a', 'blocked')
+        successor = self.launch('a', previous=attempt['event_id'])
+        self.assertEqual(successor['role'], 'executor')
+        with self.assertRaises(ValueError):
+            self.launch('a', previous=attempt['event_id'])
 
     def test_explicit_infrastructure_retry_preserves_partial_source_and_role(self):
         a = self.launch('a')

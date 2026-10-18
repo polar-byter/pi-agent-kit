@@ -31,7 +31,7 @@ class LanguagePreferencesTests(unittest.TestCase):
             root = Path(folder)
             i18n.save_language(root, 'ru')
             self.assertEqual(i18n.load_language(root), 'ru')
-            self.assertFalse((root / '.opencode').exists())
+            self.assertFalse((root / '.pi').exists())
             self.assertEqual(json.loads((root / i18n.PREFERENCES).read_text()), {'language': 'ru'})
             self.assertFalse((root / i18n.PREFERENCES).with_suffix('.tmp').exists())
             i18n.save_language(root, 'en')
@@ -88,7 +88,7 @@ class DesktopLanguageTests(unittest.TestCase):
     def test_explicit_english_interface_and_errors_override_system_language(self):
         self.assertEqual(self.ui.translator.language, 'en')
         self.assertEqual(self.ui.save_button.cget('text'), 'Save settings')
-        self.assertEqual(self.window.title(), 'Project models — OpenCode Kit')
+        self.assertEqual(self.window.title(), 'Project models — Pi Kit')
         self.assertFalse(any(CYRILLIC.search(label) for label in self.labels(self.window)))
         self.ui.vars['exec_source'].set('api')
         self.assertFalse(self.ui.on_save())
@@ -128,7 +128,7 @@ class DesktopLanguageTests(unittest.TestCase):
             self.assertEqual(tab.tree.heading('input', 'text'), 'Input $/1M')
             self.assertEqual(self.ui.snapshot(), before)
             save.assert_not_called()
-        self.assertFalse((self.root / '.opencode').exists())
+        self.assertFalse((self.root / '.pi').exists())
         self.assertNotIn('draft-key', (self.root / i18n.PREFERENCES).read_text())
 
     def test_selected_filter_combo_uses_same_value_after_translation(self):

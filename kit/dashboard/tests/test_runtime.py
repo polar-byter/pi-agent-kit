@@ -57,6 +57,18 @@ class RuntimeHTTP(unittest.TestCase):
         self.assertIn('Refreshes every 2 seconds', text)
         self.assertIn('id="language-select"', text)
 
+    def test_pi_project_uses_its_runtime_name_and_translations(self):
+        (self.root / 'pi-kit.json').write_text(json.dumps({'runtime': 'pi'}), encoding='utf-8')
+        code, _, page = self.request('/')
+        self.assertEqual(code, 200)
+        self.assertIn("data.title + ' · Pi'", page)
+        self.assertIn('Prepare Pi', page)
+        self.assertNotIn('Prepare OpenCode', page)
+        code, _, body = self.request('/api/i18n')
+        self.assertEqual(code, 200)
+        catalog = json.loads(body)['catalog']
+        self.assertEqual(catalog['Pi task'], 'Задача Pi')
+
     def test_task_id_selects_the_right_journal(self):
         for task, title in [('first', 'Первая <b>задача</b>'), ('second', 'Вторая задача')]:
             code, _, text = self.request('/api/task?' + urlencode({'task': task, 'project': project_id(self.root)}))

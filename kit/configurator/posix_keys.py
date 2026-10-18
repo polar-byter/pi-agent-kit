@@ -12,7 +12,7 @@ def location():
     base = Path(selected) if selected else Path.home() / '.config'
     if not base.is_absolute():
         base = Path.home() / '.config'
-    return plain_path(base / 'opencode-kit' / 'keys.json')
+    return plain_path(base / 'pi-agent-kit' / 'keys.json')
 
 
 def private(path):

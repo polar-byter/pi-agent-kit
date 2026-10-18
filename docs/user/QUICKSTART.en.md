@@ -1,3 +1,7 @@
+> Материал исходной версии OpenCode. Сохранён для изучения общего кита и истории.
+> Для текущей адаптации используй [быстрый старт Pi](../user/PI_QUICKSTART.ru.md)
+> и [карту адаптеров](../kit/PI_ADAPTERS.ru.md). Команды OpenCode здесь не являются командами Pi.
+
 # Quick start: the OpenCode kit, step by step in plain words
 
 > A from-scratch guide for people who do not write code every day.

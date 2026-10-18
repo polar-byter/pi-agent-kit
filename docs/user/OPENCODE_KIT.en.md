@@ -1,3 +1,7 @@
+> Материал исходной версии OpenCode. Сохранён для изучения общего кита и истории.
+> Для текущей адаптации используй [быстрый старт Pi](../user/PI_QUICKSTART.ru.md)
+> и [карту адаптеров](../kit/PI_ADAPTERS.ru.md). Команды OpenCode здесь не являются командами Pi.
+
 # Your first OpenCode Kit project
 
 To change models or API during a task: **Pause → Model settings → Save → Prepare

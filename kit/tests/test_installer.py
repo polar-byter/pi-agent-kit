@@ -136,7 +136,12 @@ class InstallerTests(unittest.TestCase):
     def test_real_distribution_installs_and_prepares_without_model_generation(self):
         from kit import run_opencode
         source = Path(__file__).resolve().parents[2]
-        result = installer.install_project(source, str(self.target))
+        distribution = self.home / 'real-distribution'
+        for relative_path, content in installer.payload(source).items():
+            destination = distribution / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(content)
+        result = installer.install_project(distribution, str(self.target))
         self.assertFalse(result['reused'])
         run_opencode.prepare(self.target)
         config = json.loads(run_opencode.strip_jsonc((self.target / '.opencode/opencode.jsonc').read_text(encoding='utf-8')))
