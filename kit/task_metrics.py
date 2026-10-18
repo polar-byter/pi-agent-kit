@@ -537,6 +537,12 @@ class TaskMetrics(TaskJournal, SuiteRunnerMixin, UsageReportMixin):
                         raise ValueError(f'UI/UX check {index}: "fixed" must be text')
                     if fixed.strip():
                         item['fixed'] = fixed.strip()
+                from kit.browser_evidence import validate_browser_evidence
+                item['browser_evidence'] = validate_browser_evidence(self.root, task, row.get('browser_evidence'))
+                observation = row.get('visual_observation')
+                if not isinstance(observation, str) or not observation.strip():
+                    raise ValueError('A completed UX scenario needs a visual_observation from its screenshot.')
+                item['visual_observation'] = observation.strip()
                 clean.append(item)
             data = dict(outcome='completed', checks=clean, scenarios=len(clean),
                         fixed=sum('fixed' in item for item in clean))

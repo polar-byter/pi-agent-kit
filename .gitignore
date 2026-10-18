@@ -27,3 +27,6 @@ currentsteps.md
 # Model choice saved by the model configurator on this computer
 .opencode/kit-models.json
 # Local drafts of Habr articles (published separately)
+
+# Browser CLI output outside managed task folders
+.playwright-cli/

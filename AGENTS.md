@@ -124,3 +124,17 @@ with --previous, under the same requirements, contracts and remaining budgets.
 A token_limit is an incomplete attempt and follows the bounded correction route.
 Do not disable the fixer, reset counters, change models or implement worker bodies
 to get around a rejected attempt. Task pause/resume does not reset repair budgets.
+
+## Real browser review and completed reports
+
+Use the kit_browser tool in native Pi, or kit/python.cmd -B -m kit.browser_review
+--task <ID> <action> <arguments> in OpenCode or headless mode. Read
+ docs/kit/BROWSER_AND_REPORT.ru.md before the UX stage. Open the actual local app,
+exercise its controls, inspect screenshots, and record browser_evidence and
+visual_observation for every completed scenario. HTTP calls and mocked DOM/canvas
+are supplementary tests; they do not establish a completed visual review.
+If the browser or an image-capable reviewer is unavailable, record --skipped
+with the actual reason. Do not silently change models or fabricate evidence.
+After finish, discuss the result and read the frozen report with kit_task_report
+or kit/python.cmd -B -m kit.task_report --task <ID>. Never reset accounting or
+start new work inside a completed task. Native Pi uses /new for new development.

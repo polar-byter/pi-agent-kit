@@ -2,6 +2,7 @@
 import { callBroker } from './native_chief_control.mjs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { registerChiefReviewTools } from './chief_review_tools.mjs';
 
 export function createChiefExtension(projectRoot, state, options) {
   return pi => {
@@ -20,25 +21,45 @@ export function createChiefExtension(projectRoot, state, options) {
         return false;
       }
     }
+    async function discussionStatus() {
+      const status = await callBroker(projectRoot, 'task.status', parameters());
+      return status.finished && !status.halted;
+    }
+    async function allowConversation(context) {
+      try { if (await discussionStatus()) return true; }
+      catch (error) { context.ui.notify(error.message, 'error'); return false; }
+      return checkWork(context);
+    }
+    registerChiefReviewTools(pi, projectRoot, state, options);
     pi.on('session_start', async (_event, context) => {
       state.context = context;
       context.ui.setStatus('pi-kit', 'Pi Kit · ' + state.task);
       await callBroker(projectRoot, 'task.dashboard', parameters(), { open_browser: !options.noBrowser });
     });
     pi.on('input', async (_event, context) => {
-      if (!await checkWork(context)) return { action: 'handled' };
+      if (!await allowConversation(context)) return { action: 'handled' };
       return { action: 'continue' };
     });
     pi.on('before_agent_start', async (event, context) => {
-      if (!await checkWork(context)) { context.abort(); return; }
+      if (!await allowConversation(context)) { context.abort(); return; }
       const taskContext = `Managed Pi kit task: ${state.task}. Exact Chief session: ${state.identifier}. `
         + 'The journal already exists with tracked delegations. Never start a second journal for this task. '
         + 'For a development request, follow AGENTS.md and the saved plan through controlled delegation, '
         + 'inspection, tests, review and integration. Record finish only after the complete accepted workflow. '
         + 'For an ordinary question, answer the question directly; that answer does not finish a development task.';
-      return { systemPrompt: event.systemPrompt + '\n\n' + taskContext };
+      const completedContext = await discussionStatus()
+        ? ' This task has finished. You may discuss it, read files, and use kit_task_report for frozen usage. '
+          + 'Do not edit, run shell commands, launch workers, or finish again. For new development ask the user to use /new.' : '';
+      return { systemPrompt: event.systemPrompt + '\n\n' + taskContext + completedContext };
     });
-    pi.on('tool_call', async (_event, context) => {
+    pi.on('tool_call', async (event, context) => {
+      try {
+        if (await discussionStatus()) {
+          if (['read', 'kit_task_report'].includes(event.toolName)) return;
+          if (event.toolName === 'kit_browser' && event.input?.action === 'close') return;
+          return { block: true, reason: 'This task has finished. Reading and kit_task_report remain available; use /new for development.' };
+        }
+      } catch (error) { return { block: true, reason: error.message }; }
       if (!await checkWork(context)) return { block: true, reason: 'The kit has blocked work on this task' };
     });
     pi.on('agent_start', () => { state.settled = false; });

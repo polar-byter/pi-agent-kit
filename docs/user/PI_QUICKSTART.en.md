@@ -77,3 +77,10 @@ keep that template directory. Keep these local files out of source publication. 
 the service after changing environment keys if it still sees the old environment.
 
 See [validation status](../kit/PI_VALIDATION.ru.md) for checks actually performed.
+
+## After completion
+
+After finish, continue discussing the result in the same chat and ask the Chief
+for the final report through kit_task_report. Use /new for new development.
+kit_browser uses an installed Edge or Chrome. Pixel review requires an image-capable
+model. See the [browser and report guide](../kit/BROWSER_AND_REPORT.ru.md) in Russian.

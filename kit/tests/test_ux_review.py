@@ -1,5 +1,6 @@
 """The Master Chief's final UI/UX improvement stage: ux-review before finish."""
 import io
+import hashlib
 import json
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -29,6 +30,17 @@ class UxReviewTests(unittest.TestCase):
         self.metrics = TaskMetrics(self.root)
 
     def write(self, name, data):
+        if name == 'ux.json':
+            folder = self.root / '.metrics/t/browser'
+            folder.mkdir(parents=True, exist_ok=True)
+            screenshot = folder / 'test.png'
+            screenshot.write_bytes(b'\x89PNG\r\n\x1a\nunit-test-fixture')
+            receipt = folder / 'test.json'
+            receipt.write_text(json.dumps(dict(project=str(self.root.resolve()), task='t',
+                engine='playwright-cli', screenshot=screenshot.relative_to(self.root).as_posix(),
+                sha256=hashlib.sha256(screenshot.read_bytes()).hexdigest(), actions=[dict(action='open')])))
+            data = [dict(row, browser_evidence=receipt.relative_to(self.root).as_posix(),
+                         visual_observation='The screenshot shows the form and validation message beside its field.') for row in data]
         path = self.root / name
         path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
         return Path(name)

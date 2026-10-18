@@ -29,7 +29,7 @@ def launch_native_pi(project_root, options):
         transcript = gateway.call('session.releaseForInteractive', {'sessionID': options.session})['transcript']
     metadata = dict(root=str(project_root), packageRoot=str(package_root), session=options.session,
                     transcript=transcript, task=options.task, prompt=options.prompt,
-                    noBrowser=options.no_browser)
+                    noBrowser=options.no_browser, pythonExecutable=sys.executable)
     context_file = project_root / '.pi/kit-service/native-launch' / (uuid.uuid4().hex + '.json')
     write_private_json(context_file, metadata)
     try:

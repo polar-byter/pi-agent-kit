@@ -33,7 +33,7 @@ async function createRuntime({ cwd, sessionManager, sessionStartEvent }) {
   const selectedModel = services.modelRuntime.getModel(chief.provider, chief.model);
   if (!selectedModel) throw new Error('The configured Chief model is unavailable. Open the configurator.');
   const created = await sdk.createAgentSessionFromServices({ services, sessionManager, sessionStartEvent,
-    model: selectedModel, tools: ['read', process.platform === 'win32' ? 'powershell' : 'bash', 'edit', 'write'] });
+    model: selectedModel, tools: ['read', process.platform === 'win32' ? 'powershell' : 'bash', 'edit', 'write', 'kit_browser', 'kit_task_report'] });
   if (created.session.model?.provider !== chief.provider || created.session.model?.id !== chief.model) {
     throw new Error('Pi did not keep the configured Chief model');
   }

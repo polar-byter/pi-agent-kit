@@ -21,6 +21,7 @@ from kit.task_metrics import TaskMetrics
 class NativeTransportTests(unittest.TestCase):
     def setUp(self):
         self.operations = []
+        self.finished = False
         self.running = False
         owner = self
         class Handler(BaseHTTPRequestHandler):
@@ -236,6 +237,7 @@ class NativeExtensionTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
         self.operations = []
+        self.finished = False
         owner = self
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *_arguments):
@@ -244,7 +246,7 @@ class NativeExtensionTests(unittest.TestCase):
             def do_POST(self):
                 command = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
                 owner.operations.append(command['operation'])
-                results = {'task.status': {'finished': False}, 'task.controlState': {'status': 'cancelled'},
+                results = {'task.status': {'finished': owner.finished}, 'task.controlState': {'status': 'cancelled'},
                            'task.workAllowed': {'allowed': True}, 'session.detachInteractive': {'detached': True}}
                 self.send_response(200)
                 self.end_headers()
@@ -277,6 +279,21 @@ const context = {ui: {notify() {}}};
         result = subprocess.run([self.node, '--input-type=module', '-e', javascript, str(self.root), module.as_uri()],
                                 cwd=self.root, capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_finished_conversation_accepts_input_and_reading_but_blocks_mutation(self):
+        self.finished = True
+        self.run_extension(r"""
+assert.equal((await hooks.input({}, context)).action, 'continue');
+const prompt = await hooks.before_agent_start({systemPrompt: 'Original'}, context);
+assert.ok(prompt.systemPrompt.includes('This task has finished'));
+assert.equal(await hooks.tool_call({toolName: 'read'}, context), undefined);
+assert.equal(await hooks.tool_call({toolName: 'kit_task_report'}, context), undefined);
+assert.equal(await hooks.tool_call({toolName: 'kit_browser', input: {action: 'close'}}, context), undefined);
+for (const name of ['write', 'edit', 'powershell', 'bash', 'kit_browser']) {
+  assert.equal((await hooks.tool_call({toolName: name}, context)).block, true);
+}
+""")
+        self.assertNotIn('task.workAllowed', self.operations)
 
     def test_quit_detaches_an_already_cancelled_native_conversation(self):
         self.run_extension("await hooks.session_shutdown({reason: 'quit'});")
